@@ -3,7 +3,7 @@ upstream:
   repository: https://github.com/Repcz/Tool.git
   branch: X
   rules_path: Egern/Rules
-  commit: 918558a82db2f7ddbee7dbeb462772c196b380a2
+  commit: 9260550ff026b2346e22e19b4e60cd125a69e456
   mirrored_rules: 74
 targets:
   Bilibili:
