@@ -1,0 +1,50 @@
+---
+upstream:
+  repository: https://github.com/Repcz/Tool.git
+  branch: X
+  rules_path: Egern/Rules
+  commit: 918558a82db2f7ddbee7dbeb462772c196b380a2
+  mirrored_rules: 74
+targets:
+  Bilibili:
+    sources:
+    - Bilibili.yaml
+    priority: global
+    cn_rules: 16
+    global_rules: 4
+  Game:
+    sources:
+    - Game.yaml
+    priority: cn
+    cn_rules: 46
+    global_rules: 501
+  Microsoft:
+    sources:
+    - Microsoft.yaml
+    - OneDrive.yaml
+    priority: cn
+    cn_rules: 108
+    global_rules: 569
+  Apple:
+    sources:
+    - APNs.yaml
+    - AppStore.yaml
+    - Apple.yaml
+    - AppleCN.yaml
+    - AppleID.yaml
+    - AppleMedia.yaml
+    - AppleMusic.yaml
+    - AppleProxy.yaml
+    - AppleServers.yaml
+    - FitnessPlus.yaml
+    - TestFlight.yaml
+    - iCloud.yaml
+    priority: cn
+    cn_rules: 201
+    global_rules: 191
+  Google:
+    sources:
+    - Google.yaml
+    priority: cn
+    cn_rules: 2
+    global_rules: 23

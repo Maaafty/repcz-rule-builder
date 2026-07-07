@@ -1,0 +1,378 @@
+# Generated for Maaafty/repcz-rule-builder
+# Replace the Manual subscription URL before importing into Egern
+http_port: 6152
+socks_port: 6153
+vif_only: true
+hijack_dns:
+- "*:53"
+geoip_db_url: https://raw.githubusercontent.com/Loyalsoldier/geoip/release/Country-without-asn.mmdb
+asn_db_url: https://raw.githubusercontent.com/Loyalsoldier/geoip/release/GeoLite2-ASN.mmdb
+proxy_latency_test_url: https://www.gstatic.com/generate_204
+direct_latency_test_url: http://wifi.vivo.com.cn/generate_204
+dns:
+  bootstrap:
+  - system
+  - 223.5.5.5
+  - 119.29.29.29
+  upstreams:
+    Domestic-DNS:
+    - 223.5.5.5
+    - 119.29.29.29
+    Domestic-Encrypted-DNS:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+    Foreign-Encrypted-DNS:
+    - https://cloudflare-dns.com/dns-query
+    - https://dns.google/dns-query
+  forward:
+  - proxy_rule_set:
+      match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Reject.yaml
+      value: reject
+      disabled: false
+  - proxy_rule_set:
+      match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/ChinaDomain.yaml
+      value: Domestic-Encrypted-DNS
+      disabled: false
+  - domain_wildcard:
+      match: "*"
+      value: Foreign-Encrypted-DNS
+      disabled: false
+  hosts:
+    dns.google:
+    - 8.8.8.8
+    - 8.8.4.4
+    - 2001:4860:4860::8888
+    - 2001:4860:4860::8844
+    cloudflare-dns.com:
+    - 104.16.249.249
+    - 104.16.248.249
+    - 2606:4700::6810:f8f9
+    - 2606:4700::6810:f9f9
+    dns.alidns.com:
+    - 223.5.5.5
+    - 223.6.6.6
+    - 2400:3200:baba::1
+    - 2400:3200::1
+    doh.pub:
+    - 1.12.12.12
+    - 120.53.53.53
+    dot.pub:
+    - 1.12.12.12
+    - 120.53.53.53
+  proxy_nameservers:
+  - https://dns.alidns.com/dns-query
+  - https://doh.pub/dns-query
+real_ip_domains:
+- lancache.steamcontent.com
+- "*.msftconnecttest.com"
+- "*.msftncsi.com"
+- "*.srv.nintendo.net"
+- "*.stun.playstation.net"
+- xbox.*.microsoft.com
+- "*.xboxlive.com"
+- "*.logon.battlenet.com.cn"
+- "*.logon.battle.net"
+- stun.l.google.com
+- easy-login.10099.com.cn
+- "*-update.xoyocdn.com"
+- "*.prod.cloud.netflix.com"
+- appboot.netflix.com
+- "*-appboot.netflix.com"
+policy_groups:
+- external:
+    name: Manual
+    type: select
+    urls:
+    - https://example.com/replace-with-your-subscription
+    hidden: false
+    icon: https://github.com/Repcz/Repcz.github.io/raw/main/docs/egern/Photo/Egern.png
+- select:
+    name: Global
+    policies:
+    - United States
+    - Manual
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Global.png
+- select:
+    name: Streaming
+    policies:
+    - United States
+    - Manual
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/YouTube.png
+- select:
+    name: Microsoft
+    policies:
+    - United States
+    - Manual
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Microsoft.png
+- select:
+    name: Google
+    policies:
+    - United States
+    - Manual
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Google_Search.png
+- select:
+    name: Apple
+    policies:
+    - DIRECT
+    - United States
+    - Manual
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Apple.png
+- select:
+    name: AI
+    policies:
+    - United States
+    - Manual
+    icon: https://raw.githubusercontent.com/Orz-3/mini/master/Color/OpenAI.png
+- select:
+    name: Social
+    policies:
+    - United States
+    - Manual
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Twitter.png
+- select:
+    name: Telegram
+    policies:
+    - United States
+    - Manual
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Telegram.png
+- select:
+    name: Game
+    policies:
+    - DIRECT
+    - United States
+    - Manual
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Game.png
+- select:
+    name: Emby
+    policies:
+    - United States
+    - Manual
+    flatten: true
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Emby.png
+- select:
+    name: Spotify
+    policies:
+    - United States
+    - Manual
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Spotify.png
+- select:
+    name: Final
+    policies:
+    - United States
+    - Manual
+    - DIRECT
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Final.png
+- auto_test:
+    name: United States
+    policies:
+    - Manual
+    flatten: true
+    filter: "(?i)\U0001F1FA\U0001F1F8|美国|洛杉矶|圣何塞|(\\b(US|United States)\\b)"
+    tolerance: 0
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/United_States.png
+rules:
+- or:
+    name: Foreign DNS
+    match:
+    - domain:
+        match: cloudflare-dns.com
+    - domain:
+        match: dns.google
+    policy: Global
+    disabled: false
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Direct.yaml
+    policy: DIRECT
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Reject.yaml
+    policy: REJECT
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Ads_DiDiChuXing.yaml
+    policy: REJECT
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Ads_AWAvenue.yaml
+    policy: REJECT
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Ads_Dlerio.yaml
+    policy: REJECT
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Ads_limbopro.yaml
+    policy: REJECT
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Ads_SukkaW.yaml
+    policy: REJECT
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Ads_EasyListPrivacy.yaml
+    policy: REJECT
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/WeChat.yaml
+    policy: DIRECT
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/DownloadCDN_CN.yaml
+    policy: DIRECT
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/OpenAI.yaml
+    policy: AI
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/AI.yaml
+    policy: AI
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Telegram.yaml
+    policy: Telegram
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Twitter.yaml
+    policy: Social
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Facebook.yaml
+    policy: Social
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Instagram.yaml
+    policy: Social
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/TikTok.yaml
+    policy: Social
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Game_CN.yaml
+    policy: DIRECT
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Game_Global.yaml
+    policy: Game
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/YouTube.yaml
+    policy: Streaming
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Google_CN.yaml
+    policy: DIRECT
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Google_Global.yaml
+    policy: Google
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Github.yaml
+    policy: Microsoft
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Microsoft_CN.yaml
+    policy: DIRECT
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Microsoft_Global.yaml
+    policy: Microsoft
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Apple_CN.yaml
+    policy: DIRECT
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Apple_Global.yaml
+    policy: Apple
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Emby.yaml
+    policy: Emby
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Spotify.yaml
+    policy: Spotify
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Bilibili_Global.yaml
+    policy: Streaming
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Bilibili_CN.yaml
+    policy: DIRECT
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Bahamut.yaml
+    policy: Streaming
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Netflix.yaml
+    policy: Streaming
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Disney.yaml
+    policy: Streaming
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/PrimeVideo.yaml
+    policy: Streaming
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/HBO.yaml
+    policy: Streaming
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/ProxyMedia.yaml
+    policy: Streaming
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Crypto.yaml
+    policy: Global
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/PayPal.yaml
+    policy: Global
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Porn.yaml
+    policy: Global
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Talkatone.yaml
+    policy: United States
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/DownloadCDN_Global.yaml
+    policy: Global
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/ProxyGFW.yaml
+    policy: Global
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Proxy.yaml
+    policy: Global
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Lan.yaml
+    policy: DIRECT
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/ChinaASN.yaml
+    policy: DIRECT
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/ChinaIP.yaml
+    policy: DIRECT
+- geoip:
+    match: CN
+    policy: DIRECT
+- default:
+    policy: Final
+mitm:
+  enabled: true
+modules:
+- url: https://raw.githubusercontent.com/QingRex/LoonKissSurge/refs/heads/main/Surge/Beta/广告平台拦截器.beta.sgmodule
+  enabled: true
+- url: https://raw.githubusercontent.com/QingRex/LoonKissSurge/refs/heads/main/Surge/Beta/拦截HTTPDNS.beta.sgmodule
+  enabled: true
+- url: https://raw.githubusercontent.com/QingRex/LoonKissSurge/refs/heads/main/Surge/Beta/高德地图去广告.beta.sgmodule
+  enabled: true
+- url: https://raw.githubusercontent.com/QingRex/LoonKissSurge/refs/heads/main/Surge/Beta/闲鱼去广告.beta.sgmodule
+  enabled: true
+- url: https://raw.githubusercontent.com/QingRex/LoonKissSurge/refs/heads/main/Surge/Beta/酷安去广告.beta.sgmodule
+  enabled: true
+- url: https://raw.githubusercontent.com/QingRex/LoonKissSurge/refs/heads/main/Surge/Beta/知乎去广告.beta.sgmodule
+  enabled: true
+- url: https://raw.githubusercontent.com/QingRex/LoonKissSurge/refs/heads/main/Surge/Beta/滴滴出行去广告.beta.sgmodule
+  enabled: true
+- url: https://raw.githubusercontent.com/QingRex/LoonKissSurge/refs/heads/main/Surge/Beta/微博轻享版去广告.beta.sgmodule
+  enabled: true
+- url: https://raw.githubusercontent.com/QingRex/LoonKissSurge/refs/heads/main/Surge/Beta/微信小程序去广告.beta.sgmodule
+  enabled: true
+- url: https://raw.githubusercontent.com/QingRex/LoonKissSurge/refs/heads/main/Surge/Beta/微信公众号去广告.beta.sgmodule
+  enabled: true
+- url: https://raw.githubusercontent.com/QingRex/LoonKissSurge/refs/heads/main/Surge/Beta/小红书去广告.beta.sgmodule
+  enabled: true
+- url: https://raw.githubusercontent.com/QingRex/LoonKissSurge/refs/heads/main/Surge/Beta/什么值得买去广告.beta.sgmodule
+  enabled: true
+- url: https://raw.githubusercontent.com/QingRex/LoonKissSurge/refs/heads/main/Surge/Beta/IT之家去广告.beta.sgmodule
+  enabled: true
+- url: https://raw.githubusercontent.com/fmz200/wool_scripts/refs/heads/main/Surge/module/XWebAds.module
+  enabled: true
+- url: https://raw.githubusercontent.com/Keywos/rule/main/script/wy/wy.sgmodule
+  enabled: true
+- url: https://raw.githubusercontent.com/Maasea/sgmodule/master/YouTube.Enhance.sgmodule
+  enabled: true
+- url: https://raw.githubusercontent.com/ConnersHua/RuleGo/master/Surge/Module/Block/Advertising.sgmodule
+  enabled: true
+- url: https://raw.githubusercontent.com/githubdulong/Script/master/Surge/jd_price2.sgmodule
+  enabled: true
+- url: https://github.com/chavyleung/scripts/raw/master/box/rewrite/boxjs.rewrite.surge.sgmodule
+  enabled: true
+- url: https://raw.githubusercontent.com/kokoryh/Sparkle/refs/heads/master/release/surge/module/bilibili.sgmodule
+  enabled: true
+- url: https://raw.githubusercontent.com/xream/scripts/main/surge/modules/network-info/network-info-lite.sgmodule
+  enabled: false
+- url: https://raw.githubusercontent.com/001ProMax/Surge/main/Module/AD/Spotify.sgmodule
+  enabled: false
+- name: SubStore
+  url: https://raw.githubusercontent.com/sub-store-org/Sub-Store/refs/heads/master/config/Egern.yaml
+  enabled: false

@@ -1,0 +1,45 @@
+name: Build split Egern rules
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-split-rules
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out builder
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Fetch upstream rules
+        run: |
+          git clone --depth 1 --branch X --filter=blob:none https://github.com/Repcz/Tool.git .upstream
+          echo "UPSTREAM_SHA=$(git -C .upstream rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Build and validate
+        run: ruby scripts/build.rb --source .upstream --sha "$UPSTREAM_SHA"
+
+      - name: Run tests
+        run: ruby -Itest test/test_build.rb
+
+      - name: Commit changed outputs
+        run: |
+          printf '%s\n' "$UPSTREAM_SHA" > UPSTREAM_COMMIT
+          if [[ -z "$(git status --porcelain -- generated UPSTREAM_COMMIT)" ]]; then
+            echo "No generated changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add generated UPSTREAM_COMMIT
+          git commit -m "build: update rules from Repcz/Tool@$UPSTREAM_SHA"
+          git push
+

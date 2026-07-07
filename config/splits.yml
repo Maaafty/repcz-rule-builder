@@ -1,0 +1,78 @@
+upstream:
+  repository: https://github.com/Repcz/Tool.git
+  branch: X
+  rules_path: Egern/Rules
+
+references:
+  china_domain: ChinaDomain.yaml
+  china_ip: ChinaIP.yaml
+  china_asn: ChinaASN.yaml
+
+targets:
+  Bilibili:
+    sources:
+      - Bilibili.yaml
+    priority: global
+    match_china_domain: true
+    match_cn_tld: true
+    force_cn:
+      - acg.tv
+      - b23.tv
+      - im9.com
+      - upos-hz-mirrorakam.akamaized.net
+    force_global:
+      - apiintl.biliapi.net
+      - biliintl.co
+      - bilibili.co
+      - bilibili.tv
+
+  Game:
+    sources:
+      - Game.yaml
+    priority: cn
+    match_china_domain: true
+    match_cn_tld: true
+    force_global:
+      - battle.net
+      - blizzard.com
+      - "*.cdn.blizzard.com"
+      - level3.blizzard.com
+      - steamserver.net
+
+  Microsoft:
+    sources:
+      - Microsoft.yaml
+      - OneDrive.yaml
+    priority: cn
+    match_china_domain: true
+    match_cn_tld: true
+
+  Apple:
+    sources:
+      - APNs.yaml
+      - AppStore.yaml
+      - Apple.yaml
+      - AppleCN.yaml
+      - AppleID.yaml
+      - AppleMedia.yaml
+      - AppleMusic.yaml
+      - AppleProxy.yaml
+      - AppleServers.yaml
+      - FitnessPlus.yaml
+      - TestFlight.yaml
+      - iCloud.yaml
+    cn_sources:
+      - AppleCN.yaml
+    priority: cn
+    match_china_domain: true
+    match_cn_tld: true
+
+  Google:
+    sources:
+      - Google.yaml
+    priority: cn
+    match_china_domain: false
+    match_cn_tld: false
+    force_cn:
+      - googleapis.cn
+      - gstatic.cn
