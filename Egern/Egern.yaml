@@ -1,5 +1,6 @@
 # Generated for Maaafty/repcz-rule-builder
-# Replace the Manual subscription URL before importing into Egern
+# Replace the Proxy subscription URL before importing into Egern
+default_subscription_group: Proxy
 http_port: 6152
 socks_port: 6153
 vif_only: true
@@ -80,96 +81,81 @@ real_ip_domains:
 - "*-appboot.netflix.com"
 policy_groups:
 - external:
-    name: Manual
+    name: Proxy
     type: select
     urls:
     - https://example.com/replace-with-your-subscription
     hidden: false
     icon: https://github.com/Repcz/Repcz.github.io/raw/main/docs/egern/Photo/Egern.png
 - select:
-    name: Global
-    policies:
-    - United States
-    - Manual
-    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Global.png
-- select:
     name: Streaming
     policies:
-    - United States
-    - Manual
+    - Proxy
+    flatten: true
     icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/YouTube.png
 - select:
     name: Microsoft
     policies:
-    - United States
-    - Manual
+    - Proxy
+    flatten: true
     icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Microsoft.png
 - select:
     name: Google
     policies:
-    - United States
-    - Manual
+    - Proxy
+    flatten: true
     icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Google_Search.png
 - select:
     name: Apple
     policies:
     - DIRECT
-    - United States
-    - Manual
+    - Proxy
+    flatten: true
     icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Apple.png
 - select:
     name: AI
     policies:
-    - United States
-    - Manual
+    - Proxy
+    flatten: true
     icon: https://raw.githubusercontent.com/Orz-3/mini/master/Color/OpenAI.png
 - select:
     name: Social
     policies:
-    - United States
-    - Manual
+    - Proxy
+    flatten: true
     icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Twitter.png
 - select:
     name: Telegram
     policies:
-    - United States
-    - Manual
+    - Proxy
+    flatten: true
     icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Telegram.png
 - select:
     name: Game
     policies:
     - DIRECT
-    - United States
-    - Manual
+    - Proxy
+    flatten: true
     icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Game.png
 - select:
     name: Emby
     policies:
-    - United States
-    - Manual
+    - Proxy
     flatten: true
     icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Emby.png
 - select:
     name: Spotify
     policies:
-    - United States
-    - Manual
+    - Proxy
+    flatten: true
     icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Spotify.png
 - select:
     name: Final
     policies:
-    - United States
-    - Manual
+    - Proxy
     - DIRECT
-    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Final.png
-- auto_test:
-    name: United States
-    policies:
-    - Manual
     flatten: true
-    filter: "(?i)\U0001F1FA\U0001F1F8|美国|洛杉矶|圣何塞|(\\b(US|United States)\\b)"
-    tolerance: 0
-    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/United_States.png
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Final.png
 rules:
 - or:
     name: Foreign DNS
@@ -178,7 +164,7 @@ rules:
         match: cloudflare-dns.com
     - domain:
         match: dns.google
-    policy: Global
+    policy: Proxy
     disabled: false
 - rule_set:
     match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Direct.yaml
@@ -293,25 +279,25 @@ rules:
     policy: Streaming
 - rule_set:
     match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Crypto.yaml
-    policy: Global
+    policy: Proxy
 - rule_set:
     match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/PayPal.yaml
-    policy: Global
+    policy: Proxy
 - rule_set:
     match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Porn.yaml
-    policy: Global
+    policy: Proxy
 - rule_set:
     match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Talkatone.yaml
-    policy: United States
+    policy: Proxy
 - rule_set:
     match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/DownloadCDN_Global.yaml
-    policy: Global
+    policy: Proxy
 - rule_set:
     match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/ProxyGFW.yaml
-    policy: Global
+    policy: Proxy
 - rule_set:
     match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Proxy.yaml
-    policy: Global
+    policy: Proxy
 - rule_set:
     match: https://raw.githubusercontent.com/Maaafty/repcz-rule-builder/main/generated/Egern/Rules/Lan.yaml
     policy: DIRECT
