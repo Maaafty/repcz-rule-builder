@@ -71,3 +71,6 @@ china_domain_extra_outputs:
   - Apple_CN
   - Microsoft_CN
   - Google_CN
+
+no_resolve_outputs:
+  - Telegram

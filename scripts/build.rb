@@ -132,7 +132,7 @@ module EgernRules
     end
   end
 
-  def dump_rule(name, fields, sources)
+  def dump_rule(name, fields, sources, no_resolve: false)
     count = fields.values.sum(&:length)
     raise "#{name}: generated an empty rule set" if count.zero?
 
@@ -142,6 +142,7 @@ module EgernRules
       "# Rule count: #{count}",
       ""
     ]
+    lines << "no_resolve: true" << "" if no_resolve
     FIELD_ORDER.each do |field|
       values = fields[field]
       next if values.nil? || values.empty?
@@ -232,11 +233,17 @@ module EgernRules
     output_sources["ChinaIP"] = ["Loyalsoldier:Country-without-asn.mmdb"]
     outputs["Reject"] = parse_anti_ad(anti_ad_path)
     output_sources["Reject"] = ["anti-AD:anti-ad-surge.txt"]
+    no_resolve_outputs = Array(config["no_resolve_outputs"])
+    unknown_no_resolve = no_resolve_outputs - outputs.keys
+    raise "Unknown no_resolve outputs: #{unknown_no_resolve.join(', ')}" unless unknown_no_resolve.empty?
 
     FileUtils.mkdir_p(output)
     Dir[File.join(output, "*.yaml")].each { |path| FileUtils.rm_f(path) }
     outputs.each do |name, fields|
-      File.write(File.join(output, "#{name}.yaml"), dump_rule(name, fields, output_sources.fetch(name)))
+      File.write(
+        File.join(output, "#{name}.yaml"),
+        dump_rule(name, fields, output_sources.fetch(name), no_resolve: no_resolve_outputs.include?(name))
+      )
     end
 
     manifest = {

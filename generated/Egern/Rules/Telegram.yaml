@@ -2,6 +2,8 @@
 # Sources: v2fly:telegram, telegram:cidr
 # Rule count: 35
 
+no_resolve: true
+
 domain_suffix_set:
   - "cdn-telegram.org"
   - "comments.app"

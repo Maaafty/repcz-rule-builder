@@ -52,6 +52,7 @@ class BuildTest < Minitest::Test
     assert_equal ["CN"], rule("ChinaIP").fetch("geoip_set")
     assert_equal ["ads.example"], rule("Reject").fetch("domain_suffix_set")
     assert_includes rule("Telegram").fetch("ip_cidr6_set"), "2001:b28:f23d::/48"
+    assert_equal true, rule("Telegram").fetch("no_resolve")
     refute File.exist?(File.join(@output, "OldMirror.yaml"))
     assert_equal 17, manifest.fetch("outputs").length
   end
@@ -141,7 +142,8 @@ class BuildTest < Minitest::Test
         "Social" => group(%w[facebook instagram twitter])
       },
       "china_domain_list" => "geolocation-cn",
-      "china_domain_extra_outputs" => %w[Bilibili_CN Game_CN Apple_CN Microsoft_CN Google_CN]
+      "china_domain_extra_outputs" => %w[Bilibili_CN Game_CN Apple_CN Microsoft_CN Google_CN],
+      "no_resolve_outputs" => ["Telegram"]
     }
   end
 
