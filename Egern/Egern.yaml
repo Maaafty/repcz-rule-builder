@@ -78,9 +78,6 @@ dns:
     doh.pub:
     - 1.12.12.12
     - 120.53.53.53
-  proxy_nameservers:
-  - https://dns.alidns.com/dns-query
-  - https://doh.pub/dns-query
 
 real_ip_domains:
 - lancache.steamcontent.com
