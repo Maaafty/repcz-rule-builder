@@ -1,15 +1,15 @@
-name: Build split Egern rules
+name: Build Egern rules
 
 on:
   schedule:
-    - cron: "17 */6 * * *"
+    - cron: "17 3 * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: build-split-rules
+  group: build-egern-rules
   cancel-in-progress: true
 
 jobs:
@@ -19,26 +19,30 @@ jobs:
       - name: Check out builder
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
-      - name: Fetch upstream rules
+      - name: Download verified upstream data
         run: |
-          git clone --depth 1 --branch X --filter=blob:none https://github.com/Repcz/Tool.git .upstream
-          echo "UPSTREAM_SHA=$(git -C .upstream rev-parse HEAD)" >> "$GITHUB_ENV"
-
-      - name: Build and validate
-        run: ruby scripts/build.rb --source .upstream --sha "$UPSTREAM_SHA"
+          mkdir -p .cache
+          curl -L --fail --retry 3 -o .cache/dlc.dat_plain.yml https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat_plain.yml
+          curl -L --fail --retry 3 -o .cache/dlc.dat_plain.yml.sha256sum https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat_plain.yml.sha256sum
+          curl -L --fail --retry 3 -o .cache/anti-ad-surge.txt https://raw.githubusercontent.com/privacy-protection-tools/anti-AD/master/anti-ad-surge.txt
+          curl -L --fail --retry 3 -o .cache/telegram-cidr.txt https://core.telegram.org/resources/cidr.txt
+          cd .cache
+          sha256sum -c dlc.dat_plain.yml.sha256sum
 
       - name: Run tests
         run: ruby -Itest test/test_build.rb
 
+      - name: Build rules
+        run: ruby scripts/build.rb --v2fly .cache/dlc.dat_plain.yml --anti-ad .cache/anti-ad-surge.txt --telegram .cache/telegram-cidr.txt
+
       - name: Commit changed outputs
         run: |
-          printf '%s\n' "$UPSTREAM_SHA" > UPSTREAM_COMMIT
-          if [[ -z "$(git status --porcelain -- generated UPSTREAM_COMMIT)" ]]; then
+          if [[ -z "$(git status --porcelain -- generated)" ]]; then
             echo "No generated changes"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add generated UPSTREAM_COMMIT
-          git commit -m "build: update rules from Repcz/Tool@$UPSTREAM_SHA"
+          git add generated
+          git commit -m "build: update Egern rules"
           git push

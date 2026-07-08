@@ -9,72 +9,161 @@ require_relative "../scripts/build"
 class BuildTest < Minitest::Test
   def setup
     @tmp = Dir.mktmpdir
-    @rules = File.join(@tmp, "Egern", "Rules")
-    FileUtils.mkdir_p(@rules)
-    write_rule("ChinaDomain.yaml", "domain_suffix_set" => ["cn.example"])
-    write_rule("ChinaIP.yaml", "ip_cidr_set" => ["10.0.0.0/8"])
-    write_rule("ChinaASN.yaml", "asn_set" => ["AS123"])
-    write_rule("Service.yaml", {
-      "domain_set" => ["local.cn.example", "intl.cn.example", "global.example"],
-      "domain_suffix_set" => ["cn.example", "world.example"],
-      "ip_cidr_set" => ["10.1.0.0/16", "192.0.2.0/24"]
-    })
+    @v2fly = File.join(@tmp, "dlc.yml")
+    @anti_ad = File.join(@tmp, "anti-ad.txt")
+    @telegram = File.join(@tmp, "telegram.txt")
+    @config = File.join(@tmp, "config.yml")
+    @output = File.join(@tmp, "generated", "Egern", "Rules")
+    FileUtils.mkdir_p(@output)
+    File.write(File.join(@output, "OldMirror.yaml"), "domain_set:\n  - old.example\n")
+
+    write_v2fly
+    File.write(@anti_ad, "# anti-AD\nDOMAIN-SUFFIX,ads.example\nDOMAIN-SUFFIX,sub.ads.example\n")
+    File.write(@telegram, "91.108.4.0/22\n2001:b28:f23d::/48\n")
+    File.write(@config, YAML.dump(config))
   end
 
   def teardown
     FileUtils.remove_entry(@tmp)
   end
 
-  def test_builds_lossless_partition_with_specific_global_override
-    config = write_config("global")
-    output = File.join(@tmp, "generated", "Egern", "Rules")
-    manifest = SplitRules.build(config_path: config, source: @tmp, output: output, upstream_sha: "abc123")
+  def test_builds_region_aware_minimal_rules
+    manifest = EgernRules.build(
+      config_path: @config,
+      v2fly_path: @v2fly,
+      anti_ad_path: @anti_ad,
+      telegram_path: @telegram,
+      output: @output
+    )
 
-    cn = YAML.safe_load(File.read(File.join(output, "Service_CN.yaml")), aliases: false)
-    global = YAML.safe_load(File.read(File.join(output, "Service_Global.yaml")), aliases: false)
-    assert File.exist?(File.join(output, "Service.yaml")), "upstream rule was not mirrored"
-    assert_includes cn.fetch("domain_set"), "local.cn.example"
-    assert_includes global.fetch("domain_set"), "intl.cn.example"
-    assert_includes cn.fetch("ip_cidr_set"), "10.1.0.0/16"
-    assert_equal 3, manifest.dig("targets", "Service", "cn_rules")
-    assert_equal 4, manifest.dig("targets", "Service", "global_rules")
-    assert_equal 4, manifest.dig("upstream", "mirrored_rules")
+    bilibili_cn = rule("Bilibili_CN")
+    bilibili_global = rule("Bilibili_Global")
+    streaming = rule("Streaming")
+    game_cn = rule("Game_CN")
+    game_global = rule("Game_Global")
+    china = rule("ChinaDomain")
+
+    assert_includes bilibili_cn.fetch("domain_suffix_set"), "bilibili.com"
+    assert_includes bilibili_global.fetch("domain_suffix_set"), "bilibili.tv"
+    refute_includes streaming.fetch("domain_suffix_set"), "youtube.cn"
+    assert_includes game_cn.fetch("domain_suffix_set"), "steam.cn"
+    assert_includes game_global.fetch("domain_suffix_set"), "steam.com"
+    assert_includes china.fetch("domain_suffix_set"), "apple.cn"
+    assert_equal ["CN"], rule("ChinaIP").fetch("geoip_set")
+    assert_equal ["ads.example"], rule("Reject").fetch("domain_suffix_set")
+    assert_includes rule("Telegram").fetch("ip_cidr6_set"), "2001:b28:f23d::/48"
+    refute File.exist?(File.join(@output, "OldMirror.yaml"))
+    assert_equal 17, manifest.fetch("outputs").length
   end
 
-  def test_rejects_priority_that_shadows_specific_override
-    config = write_config("cn")
-    error = assert_raises(RuntimeError) do
-      SplitRules.build(config_path: config, source: @tmp, output: File.join(@tmp, "out"), upstream_sha: "abc123")
+  def test_rejects_a_priority_rule_that_shadows_the_other_region
+    first = { "domain_suffix_set" => Set["example.com"] }
+    second = { "domain_set" => Set["global.example.com"] }
+    error = assert_raises(RuntimeError) { EgernRules.validate_split!("Example", first, second) }
+    assert_match(/shadows/, error.message)
+  end
+
+  def test_egern_config_references_every_generated_rule_once
+    root = File.expand_path("..", __dir__)
+    config = YAML.safe_load(File.read(File.join(root, "Egern", "Egern.yaml")), aliases: false)
+    referenced = config.fetch("rules").map do |rule|
+      item = rule["rule_set"]
+      File.basename(item["match"], ".yaml") if item
+    end.compact
+    generated = Dir[File.join(root, "generated", "Egern", "Rules", "*.yaml")].map do |path|
+      File.basename(path, ".yaml")
     end
-    assert_match(/shadows forced/, error.message)
+
+    assert_equal generated.sort, referenced.sort
+    assert_equal referenced.uniq, referenced
+    assert_equal %w[
+      Reject Bilibili_Global Bilibili_CN Game_CN Apple_CN Microsoft_CN Google_CN
+      AI Streaming Game_Global Telegram Social Apple_Global Microsoft_Global
+      Google_Global ChinaDomain ChinaIP
+    ], referenced
   end
 
   private
 
-  def write_rule(name, data)
-    File.write(File.join(@rules, name), YAML.dump(data))
+  def rule(name)
+    YAML.safe_load(File.read(File.join(@output, "#{name}.yaml")), aliases: false)
   end
 
-  def write_config(priority)
-    config = {
-      "upstream" => { "rules_path" => "Egern/Rules" },
-      "references" => {
-        "china_domain" => "ChinaDomain.yaml",
-        "china_ip" => "ChinaIP.yaml",
-        "china_asn" => "ChinaASN.yaml"
+  def write_v2fly
+    lists = {
+      "bilibili" => ["domain:bilibili.com", "domain:bilibili.tv:@!cn"],
+      "category-games-cn" => ["domain:game.cn"],
+      "category-games-!cn" => ["domain:steam.com", "domain:steam.cn:@cn"],
+      "apple" => ["domain:apple.com", "domain:apple.cn:@cn"],
+      "microsoft" => ["domain:microsoft.com", "domain:microsoft.cn:@cn"],
+      "google" => ["domain:google.com", "domain:google.cn:@cn"],
+      "category-ai-!cn" => ["domain:openai.com"],
+      "youtube" => ["domain:youtube.com", "domain:youtube.cn:@cn"],
+      "netflix" => ["domain:netflix.com"],
+      "disney" => ["domain:disneyplus.com"],
+      "hbo" => ["domain:max.com"],
+      "spotify" => ["domain:spotify.com"],
+      "bahamut" => ["domain:gamer.com.tw"],
+      "tiktok" => ["domain:tiktok.com"],
+      "primevideo" => ["domain:primevideo.com"],
+      "telegram" => ["domain:telegram.org"],
+      "facebook" => ["domain:facebook.com"],
+      "instagram" => ["domain:instagram.com"],
+      "twitter" => ["domain:x.com"],
+      "geolocation-cn" => ["domain:cn.example"]
+    }.map do |name, rules|
+      { "name" => name, "length" => rules.length, "rules" => rules }
+    end
+    File.write(@v2fly, YAML.dump("lists" => lists))
+  end
+
+  def config
+    {
+      "splits" => {
+        "Bilibili" => split("bilibili", "global", ["!cn"], ["!cn"]),
+        "Game" => {
+          "list" => "category-games-cn",
+          "global_list" => "category-games-!cn",
+          "cn_extra_list" => "category-games-!cn",
+          "cn_extra_require_tags" => ["cn"],
+          "priority" => "cn",
+          "cn" => { "exclude_tags" => ["!cn"] },
+          "global" => { "exclude_tags" => ["cn"] }
+        },
+        "Apple" => corporate_split("apple"),
+        "Microsoft" => corporate_split("microsoft"),
+        "Google" => corporate_split("google")
       },
-      "targets" => {
-        "Service" => {
-          "sources" => ["Service.yaml"],
-          "priority" => priority,
-          "match_china_domain" => true,
-          "match_cn_tld" => true,
-          "force_global" => ["intl.cn.example"]
-        }
-      }
+      "groups" => {
+        "AI" => group(["category-ai-!cn"]),
+        "Streaming" => group(%w[youtube netflix disney hbo spotify bahamut tiktok primevideo]),
+        "Telegram" => group(["telegram"]),
+        "Social" => group(%w[facebook instagram twitter])
+      },
+      "china_domain_list" => "geolocation-cn",
+      "china_domain_extra_outputs" => %w[Bilibili_CN Game_CN Apple_CN Microsoft_CN Google_CN]
     }
-    path = File.join(@tmp, "config.yml")
-    File.write(path, YAML.dump(config))
-    path
+  end
+
+  def split(list, priority, cn_excludes, global_requires)
+    {
+      "list" => list,
+      "priority" => priority,
+      "cn" => { "exclude_tags" => cn_excludes },
+      "global" => { "require_tags" => global_requires }
+    }
+  end
+
+  def corporate_split(list)
+    {
+      "list" => list,
+      "priority" => "cn",
+      "cn" => { "require_tags" => ["cn"] },
+      "global" => { "exclude_tags" => ["cn"] }
+    }
+  end
+
+  def group(lists)
+    { "lists" => lists, "exclude_tags" => %w[cn ads] }
   end
 end

@@ -1,6 +1,0 @@
-# 规则名称: Claude
-# 规则统计: 2
-
-domain_suffix_set:
-  - anthropic.com
-  - claude.ai

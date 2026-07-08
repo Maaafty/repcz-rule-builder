@@ -1,50 +1,29 @@
 ---
-upstream:
-  repository: https://github.com/Repcz/Tool.git
-  branch: X
-  rules_path: Egern/Rules
-  commit: 918558a82db2f7ddbee7dbeb462772c196b380a2
-  mirrored_rules: 74
-targets:
-  Bilibili:
-    sources:
-    - Bilibili.yaml
-    priority: global
-    cn_rules: 16
-    global_rules: 4
-  Game:
-    sources:
-    - Game.yaml
-    priority: cn
-    cn_rules: 46
-    global_rules: 501
-  Microsoft:
-    sources:
-    - Microsoft.yaml
-    - OneDrive.yaml
-    priority: cn
-    cn_rules: 108
-    global_rules: 569
-  Apple:
-    sources:
-    - APNs.yaml
-    - AppStore.yaml
-    - Apple.yaml
-    - AppleCN.yaml
-    - AppleID.yaml
-    - AppleMedia.yaml
-    - AppleMusic.yaml
-    - AppleProxy.yaml
-    - AppleServers.yaml
-    - FitnessPlus.yaml
-    - TestFlight.yaml
-    - iCloud.yaml
-    priority: cn
-    cn_rules: 201
-    global_rules: 191
-  Google:
-    sources:
-    - Google.yaml
-    priority: cn
-    cn_rules: 2
-    global_rules: 23
+sources:
+  v2fly:
+    url: https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat_plain.yml
+    sha256: fe74e2665a8772eacf3ca6badf044b254bb12b8472e3da110ef1b6b90297bf5a
+  anti_ad:
+    url: https://raw.githubusercontent.com/privacy-protection-tools/anti-AD/master/anti-ad-surge.txt
+    sha256: 7cd037c9feb0fb5523836fd5c0f236a963c68afc31f6643a56080f4d9f210855
+  telegram:
+    url: https://core.telegram.org/resources/cidr.txt
+    sha256: 3ecd072cedf72eceee6961b18a51e37f905d5ce4a656a5d24cf5fea63e6ec651
+outputs:
+  Bilibili_CN: 48
+  Bilibili_Global: 4
+  Game_CN: 312
+  Game_Global: 791
+  Apple_CN: 291
+  Apple_Global: 1484
+  Microsoft_CN: 190
+  Microsoft_Global: 502
+  Google_CN: 126
+  Google_Global: 775
+  AI: 159
+  Streaming: 510
+  Telegram: 35
+  Social: 489
+  ChinaDomain: 7833
+  ChinaIP: 1
+  Reject: 98196

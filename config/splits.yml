@@ -1,78 +1,73 @@
-upstream:
-  repository: https://github.com/Repcz/Tool.git
-  branch: X
-  rules_path: Egern/Rules
-
-references:
-  china_domain: ChinaDomain.yaml
-  china_ip: ChinaIP.yaml
-  china_asn: ChinaASN.yaml
-
-targets:
+splits:
   Bilibili:
-    sources:
-      - Bilibili.yaml
+    list: bilibili
     priority: global
-    match_china_domain: true
-    match_cn_tld: true
-    force_cn:
-      - acg.tv
-      - b23.tv
-      - im9.com
-      - upos-hz-mirrorakam.akamaized.net
-    force_global:
-      - apiintl.biliapi.net
-      - biliintl.co
-      - bilibili.co
-      - bilibili.tv
+    exclude_tags: [ads]
+    cn:
+      exclude_tags: ["!cn"]
+    global:
+      require_tags: ["!cn"]
 
   Game:
-    sources:
-      - Game.yaml
+    list: category-games-cn
+    global_list: category-games-!cn
+    cn_extra_list: category-games-!cn
+    cn_extra_require_tags: [cn]
     priority: cn
-    match_china_domain: true
-    match_cn_tld: true
-    force_global:
-      - battle.net
-      - blizzard.com
-      - "*.cdn.blizzard.com"
-      - level3.blizzard.com
-      - steamserver.net
-
-  Microsoft:
-    sources:
-      - Microsoft.yaml
-      - OneDrive.yaml
-    priority: cn
-    match_china_domain: true
-    match_cn_tld: true
+    exclude_tags: [ads]
+    cn:
+      exclude_tags: ["!cn"]
+    global:
+      exclude_tags: [cn]
 
   Apple:
-    sources:
-      - APNs.yaml
-      - AppStore.yaml
-      - Apple.yaml
-      - AppleCN.yaml
-      - AppleID.yaml
-      - AppleMedia.yaml
-      - AppleMusic.yaml
-      - AppleProxy.yaml
-      - AppleServers.yaml
-      - FitnessPlus.yaml
-      - TestFlight.yaml
-      - iCloud.yaml
-    cn_sources:
-      - AppleCN.yaml
+    list: apple
     priority: cn
-    match_china_domain: true
-    match_cn_tld: true
+    exclude_tags: [ads]
+    cn:
+      require_tags: [cn]
+    global:
+      exclude_tags: [cn]
+
+  Microsoft:
+    list: microsoft
+    priority: cn
+    exclude_tags: [ads]
+    cn:
+      require_tags: [cn]
+    global:
+      exclude_tags: [cn]
 
   Google:
-    sources:
-      - Google.yaml
+    list: google
     priority: cn
-    match_china_domain: false
-    match_cn_tld: false
-    force_cn:
-      - googleapis.cn
-      - gstatic.cn
+    exclude_tags: [ads]
+    cn:
+      require_tags: [cn]
+    global:
+      exclude_tags: [cn]
+
+groups:
+  AI:
+    lists: [category-ai-!cn]
+    exclude_tags: [cn, ads]
+
+  Streaming:
+    lists: [youtube, netflix, disney, hbo, spotify, bahamut, tiktok, primevideo]
+    exclude_tags: [cn, ads]
+
+  Telegram:
+    lists: [telegram]
+    exclude_tags: [cn, ads]
+
+  Social:
+    lists: [facebook, instagram, twitter]
+    exclude_tags: [cn, ads]
+
+china_domain_list: geolocation-cn
+china_domain_extra_outputs:
+  - Bilibili_CN
+  - Game_CN
+  - Apple_CN
+  - Microsoft_CN
+  - Google_CN

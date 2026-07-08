@@ -1,211 +1,147 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require "digest"
 require "fileutils"
-require "ipaddr"
 require "json"
-require "open3"
 require "optparse"
 require "set"
 require "yaml"
 
-module SplitRules
+module EgernRules
+  TYPE_FIELDS = {
+    "domain" => "domain_suffix_set",
+    "full" => "domain_set",
+    "keyword" => "domain_keyword_set",
+    "regexp" => "domain_regex_set"
+  }.freeze
   FIELD_ORDER = %w[
     domain_set domain_keyword_set domain_suffix_set domain_regex_set
-    domain_wildcard_set geoip_set ip_cidr_set ip_cidr6_set url_regex_set
-    asn_set user_agent_set ssid_set bssid_set cellular_set protocol_set
-    dest_port_set and_set or_set not_set
+    geoip_set ip_cidr_set ip_cidr6_set
   ].freeze
-  DOMAIN_FIELDS = %w[domain_set domain_suffix_set].freeze
-  IP_FIELDS = %w[ip_cidr_set ip_cidr6_set].freeze
+  SOURCE_URLS = {
+    "v2fly" => "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat_plain.yml",
+    "anti_ad" => "https://raw.githubusercontent.com/privacy-protection-tools/anti-AD/master/anti-ad-surge.txt",
+    "telegram" => "https://core.telegram.org/resources/cidr.txt"
+  }.freeze
 
   module_function
 
   def load_yaml(path)
-    YAML.safe_load(
-      File.read(path),
-      permitted_classes: [],
-      permitted_symbols: [],
-      aliases: false,
-      filename: path
-    ) || {}
+    YAML.safe_load(File.read(path), permitted_classes: [], permitted_symbols: [], aliases: false, filename: path) || {}
   rescue Psych::Exception => e
     raise "Invalid YAML #{path}: #{e.message}"
   end
 
-  def load_rule(path)
-    raw = load_yaml(path)
-    raise "Rule must be a mapping: #{path}" unless raw.is_a?(Hash)
+  def parse_v2fly(path)
+    lists = load_yaml(path).fetch("lists")
+    raise "v2fly lists must be an array" unless lists.is_a?(Array)
 
-    unknown = raw.keys - FIELD_ORDER - ["no_resolve"]
-    raise "Unsupported fields in #{path}: #{unknown.join(', ')}" unless unknown.empty?
+    lists.to_h do |list|
+      name = list.fetch("name")
+      rules = list.fetch("rules").map { |line| parse_v2fly_rule(line) }
+      raise "v2fly #{name}: declared length does not match rules" unless list.fetch("length") == rules.length
 
-    fields = {}
-    FIELD_ORDER.each do |field|
-      next unless raw.key?(field)
-
-      values = raw[field]
-      raise "#{path}: #{field} must be an array" unless values.is_a?(Array)
-      raise "#{path}: #{field} only supports strings" unless values.all? { |value| value.is_a?(String) }
-
-      fields[field] = Set.new(values.map { |value| value.strip }.reject(&:empty?))
-    end
-    { "no_resolve" => raw["no_resolve"] == true, "fields" => fields }
-  end
-
-  def domain_ancestors(value)
-    labels = value.downcase.split(".")
-    (0...labels.length).map { |index| labels[index..-1].join(".") }
-  end
-
-  def domain_in_reference?(field, value, reference)
-    exact = reference["domain_set"] || Set.new
-    suffixes = reference["domain_suffix_set"] || Set.new
-    normalized = value.downcase
-
-    case field
-    when "domain_set"
-      exact.include?(normalized) || domain_ancestors(normalized).any? { |suffix| suffixes.include?(suffix) }
-    when "domain_suffix_set"
-      domain_ancestors(normalized).any? { |suffix| suffixes.include?(suffix) }
-    else
-      false
+      [name, rules]
     end
   end
 
-  def pattern_match?(value, pattern)
-    value = value.downcase
-    pattern = pattern.downcase
-    return value == pattern.delete_prefix("*.") || value.end_with?(pattern.delete_prefix("*")) if pattern.start_with?("*.")
+  def parse_v2fly_rule(line)
+    parts = line.split(":")
+    type = parts.shift
+    tags = []
+    tags.unshift(parts.pop.delete_prefix("@")) while parts.last&.start_with?("@")
+    value = parts.join(":").strip.downcase
+    raise "Unsupported v2fly rule type: #{type}" unless TYPE_FIELDS.key?(type)
+    raise "Empty v2fly rule: #{line}" if value.empty?
 
-    File.fnmatch?(pattern, value, File::FNM_CASEFOLD | File::FNM_EXTGLOB)
+    { "field" => TYPE_FIELDS.fetch(type), "value" => value, "tags" => Set.new(tags) }
   end
 
-  def forced?(value, patterns)
-    Array(patterns).any? { |pattern| pattern_match?(value, pattern) }
-  end
-
-  def ip_in_china?(value, china_ranges)
-    candidate = IPAddr.new(value)
-    china_ranges.any? do |range|
-      range.ipv4? == candidate.ipv4? &&
-        range.include?(candidate.to_range.first) &&
-        range.include?(candidate.to_range.last)
+  def select_rules(lists, names, require_tags: [], exclude_tags: [])
+    Array(names).flat_map do |name|
+      lists.fetch(name) { raise "Missing v2fly list: #{name}" }
+    end.select do |rule|
+      require_tags.all? { |tag| rule["tags"].include?(tag) } &&
+        exclude_tags.none? { |tag| rule["tags"].include?(tag) }
     end
-  rescue IPAddr::InvalidAddressError
-    raise "Invalid IP/CIDR: #{value}"
   end
 
-  def classify(field, value, settings, context, forced_cn_source)
-    force_cn = forced?(value, settings["force_cn"])
-    force_global = forced?(value, settings["force_global"])
-    raise "#{value} is forced to both CN and Global" if force_cn && force_global
-    return :cn if force_cn
-    return :global if force_global
-    return :cn if forced_cn_source
-
-    if DOMAIN_FIELDS.include?(field)
-      return :cn if settings["match_cn_tld"] && (value.downcase == "cn" || value.downcase.end_with?(".cn"))
-      return :cn if settings["match_china_domain"] && domain_in_reference?(field, value, context[:china_domains])
-    elsif IP_FIELDS.include?(field)
-      return :cn if ip_in_china?(value, context[:china_ranges])
-    elsif field == "asn_set"
-      return :cn if context[:china_asns].include?(value.downcase)
-    elsif field == "geoip_set"
-      return :cn if value.casecmp("CN").zero?
-    end
-
-    :global
+  def fields_from(rules)
+    fields = Hash.new { |hash, key| hash[key] = Set.new }
+    rules.each { |rule| fields[rule.fetch("field")] << rule.fetch("value") }
+    fields
   end
 
-  def merge_sources(rules_dir, sources)
+  def merge_fields(*groups)
     merged = Hash.new { |hash, key| hash[key] = Set.new }
-    no_resolve = false
-    sources.each do |source|
-      rule = load_rule(File.join(rules_dir, source))
-      no_resolve ||= rule["no_resolve"]
-      rule["fields"].each { |field, values| merged[field].merge(values) }
-    end
-    [merged, no_resolve]
+    groups.each { |group| group.each { |field, values| merged[field].merge(values) } }
+    merged
   end
 
-  def source_membership(rules_dir, sources)
-    entries = Set.new
-    Array(sources).each do |source|
-      load_rule(File.join(rules_dir, source))["fields"].each do |field, values|
-        values.each { |value| entries << [field, value] }
-      end
+  def minimize_domains!(fields)
+    suffixes = fields["domain_suffix_set"] || Set.new
+    suffixes.delete_if do |value|
+      labels = value.split(".")
+      (1...labels.length).any? { |index| suffixes.include?(labels[index..].join(".")) }
     end
-    entries
+    (fields["domain_set"] || Set.new).delete_if do |value|
+      labels = value.split(".")
+      (0...labels.length).any? { |index| suffixes.include?(labels[index..].join(".")) }
+    end
+    fields
+  end
+
+  def parse_anti_ad(path)
+    fields = Hash.new { |hash, key| hash[key] = Set.new }
+    File.foreach(path, chomp: true) do |line|
+      next if line.empty? || line.start_with?("#")
+
+      type, value = line.split(",", 2)
+      raise "Unsupported anti-AD rule: #{line}" unless type == "DOMAIN-SUFFIX" && value && !value.empty?
+
+      fields["domain_suffix_set"] << value.downcase
+    end
+    minimize_domains!(fields)
+  end
+
+  def parse_telegram_cidr(path)
+    fields = Hash.new { |hash, key| hash[key] = Set.new }
+    File.read(path).split.each do |cidr|
+      field = cidr.include?(":") ? "ip_cidr6_set" : "ip_cidr_set"
+      fields[field] << cidr
+    end
+    fields
   end
 
   def suffix_covers?(suffix, value)
     value == suffix || value.end_with?(".#{suffix}")
   end
 
-  def unsafe_shadowing(first, second)
-    suffixes = first["domain_suffix_set"] || Set.new
-    return [] if suffixes.empty?
-
-    shadowed = []
-    %w[domain_set domain_suffix_set].each do |field|
-      (second[field] || Set.new).each do |value|
-        covering = suffixes.find { |suffix| suffix_covers?(suffix.downcase, value.downcase) }
-        shadowed << "#{covering} shadows #{field}:#{value}" if covering
-      end
-    end
-    shadowed
-  end
-
-  def normalize_shadowing!(first, second, locked_second, target)
-    loop do
-      moved = false
-      suffixes = first["domain_suffix_set"] || Set.new
-      %w[domain_set domain_suffix_set].each do |field|
-        (second[field] || Set.new).to_a.each do |value|
-          covering = suffixes.find { |suffix| suffix_covers?(suffix.downcase, value.downcase) }
-          next unless covering
-
-          if locked_second.include?([field, value])
-            raise "#{target}: priority rule #{covering} shadows forced #{field}:#{value}"
-          end
-          second[field].delete(value)
-          first[field] << value
-          moved = true
-        end
-      end
-      break unless moved
-    end
-  end
-
-  def validate_partition!(target, original, cn, global, priority)
+  def validate_split!(name, first, second)
     FIELD_ORDER.each do |field|
-      source = original[field] || Set.new
-      cn_values = cn[field] || Set.new
-      global_values = global[field] || Set.new
-      overlap = cn_values & global_values
-      raise "#{target}: exact overlap in #{field}: #{overlap.first}" unless overlap.empty?
-      raise "#{target}: entries were lost or added in #{field}" unless (cn_values | global_values) == source
+      overlap = (first[field] || Set.new) & (second[field] || Set.new)
+      raise "#{name}: overlap in #{field}: #{overlap.first}" unless overlap.empty?
     end
 
-    first, second = priority == "global" ? [global, cn] : [cn, global]
-    shadowed = unsafe_shadowing(first, second)
-    return if shadowed.empty?
-
-    raise "#{target}: #{priority.upcase}-first order shadows later rules: #{shadowed.first(5).join('; ')}"
+    (first["domain_suffix_set"] || Set.new).each do |suffix|
+      %w[domain_set domain_suffix_set].each do |field|
+        covered = (second[field] || Set.new).find { |value| suffix_covers?(suffix, value) }
+        raise "#{name}: #{suffix} shadows #{field}:#{covered}" if covered
+      end
+    end
   end
 
-  def dump_rule(target, region, sources, upstream_sha, no_resolve, fields)
+  def dump_rule(name, fields, sources)
     count = fields.values.sum(&:length)
+    raise "#{name}: generated an empty rule set" if count.zero?
+
     lines = [
-      "# Generated by repcz-rule-builder",
-      "# Target: #{target} #{region}",
-      "# Upstream commit: #{upstream_sha}",
+      "# Generated by egern-rule-builder",
       "# Sources: #{sources.join(', ')}",
       "# Rule count: #{count}",
       ""
     ]
-    lines << "no_resolve: true" << "" if no_resolve
     FIELD_ORDER.each do |field|
       values = fields[field]
       next if values.nil? || values.empty?
@@ -217,78 +153,99 @@ module SplitRules
     lines.join("\n").rstrip + "\n"
   end
 
-  def git_sha(source)
-    output, status = Open3.capture2("git", "-C", source, "rev-parse", "HEAD")
-    status.success? ? output.strip : "local"
+  def sha256(path)
+    Digest::SHA256.file(path).hexdigest
   end
 
-  def build(config_path:, source:, output:, upstream_sha: nil)
+  def build(config_path:, v2fly_path:, anti_ad_path:, telegram_path:, output:)
     config = load_yaml(config_path)
-    rules_dir = File.join(source, config.fetch("upstream").fetch("rules_path"))
-    raise "Rules directory not found: #{rules_dir}" unless Dir.exist?(rules_dir)
+    lists = parse_v2fly(v2fly_path)
+    outputs = {}
+    output_sources = {}
 
-    references = config.fetch("references")
-    china_domains = load_rule(File.join(rules_dir, references.fetch("china_domain")))["fields"].transform_values do |values|
-      Set.new(values.map(&:downcase))
+    config.fetch("splits").each do |name, settings|
+      source = settings.fetch("list")
+      global_source = settings.fetch("global_list", source)
+      common_excludes = Array(settings["exclude_tags"])
+      cn_rules = select_rules(
+        lists,
+        source,
+        require_tags: Array(settings.dig("cn", "require_tags")),
+        exclude_tags: common_excludes + Array(settings.dig("cn", "exclude_tags"))
+      )
+      global_rules = select_rules(
+        lists,
+        global_source,
+        require_tags: Array(settings.dig("global", "require_tags")),
+        exclude_tags: common_excludes + Array(settings.dig("global", "exclude_tags"))
+      )
+
+      if settings["cn_extra_list"]
+        cn_rules += select_rules(
+          lists,
+          settings.fetch("cn_extra_list"),
+          require_tags: Array(settings["cn_extra_require_tags"]),
+          exclude_tags: common_excludes
+        )
+      end
+
+      cn = minimize_domains!(fields_from(cn_rules))
+      global = minimize_domains!(fields_from(global_rules))
+      priority = settings.fetch("priority")
+      raise "#{name}: priority must be cn or global" unless %w[cn global].include?(priority)
+
+      first, second = priority == "cn" ? [cn, global] : [global, cn]
+      validate_split!(name, first, second)
+      outputs["#{name}_CN"] = cn
+      outputs["#{name}_Global"] = global
+      output_sources["#{name}_CN"] = ["v2fly:#{source}"]
+      output_sources["#{name}_CN"] << "v2fly:#{settings.fetch('cn_extra_list')}" if settings["cn_extra_list"]
+      output_sources["#{name}_Global"] = ["v2fly:#{global_source}"]
     end
-    china_ip_rule = load_rule(File.join(rules_dir, references.fetch("china_ip")))
-    china_ranges = IP_FIELDS.flat_map { |field| (china_ip_rule["fields"][field] || Set.new).map { |value| IPAddr.new(value) } }
-    china_asns = Set.new((load_rule(File.join(rules_dir, references.fetch("china_asn")))["fields"]["asn_set"] || Set.new).map(&:downcase))
-    context = { china_domains: china_domains, china_ranges: china_ranges, china_asns: china_asns }
-    upstream_sha ||= git_sha(source)
+
+    config.fetch("groups").each do |name, settings|
+      rules = select_rules(
+        lists,
+        settings.fetch("lists"),
+        require_tags: Array(settings["require_tags"]),
+        exclude_tags: Array(settings["exclude_tags"])
+      )
+      outputs[name] = minimize_domains!(fields_from(rules))
+      output_sources[name] = settings.fetch("lists").map { |source| "v2fly:#{source}" }
+    end
+
+    outputs["Telegram"] = merge_fields(
+      outputs.fetch("Telegram"),
+      parse_telegram_cidr(telegram_path)
+    )
+    output_sources["Telegram"] << "telegram:cidr"
+
+    cn_groups = config.fetch("china_domain_extra_outputs").map { |name| outputs.fetch(name) }
+    outputs["ChinaDomain"] = minimize_domains!(merge_fields(
+      fields_from(select_rules(lists, config.fetch("china_domain_list"))),
+      *cn_groups
+    ))
+    output_sources["ChinaDomain"] = ["v2fly:#{config.fetch('china_domain_list')}"] +
+      config.fetch("china_domain_extra_outputs").map { |name| "generated:#{name}" }
+
+    outputs["ChinaIP"] = { "geoip_set" => Set["CN"] }
+    output_sources["ChinaIP"] = ["Loyalsoldier:Country-without-asn.mmdb"]
+    outputs["Reject"] = parse_anti_ad(anti_ad_path)
+    output_sources["Reject"] = ["anti-AD:anti-ad-surge.txt"]
 
     FileUtils.mkdir_p(output)
     Dir[File.join(output, "*.yaml")].each { |path| FileUtils.rm_f(path) }
-    upstream_rules = Dir[File.join(rules_dir, "*.yaml")].sort
-    upstream_rules.each { |path| FileUtils.cp(path, File.join(output, File.basename(path))) }
-    manifest_targets = {}
-
-    config.fetch("targets").each do |target, settings|
-      sources = settings.fetch("sources")
-      original, no_resolve = merge_sources(rules_dir, sources)
-      forced_cn_entries = source_membership(rules_dir, settings["cn_sources"])
-      cn = Hash.new { |hash, key| hash[key] = Set.new }
-      global = Hash.new { |hash, key| hash[key] = Set.new }
-      locked_cn = Set.new
-      locked_global = Set.new
-
-      original.each do |field, values|
-        values.each do |value|
-          entry = [field, value]
-          force_cn = forced?(value, settings["force_cn"])
-          force_global = forced?(value, settings["force_global"])
-          region = classify(field, value, settings, context, forced_cn_entries.include?(entry))
-          (region == :cn ? cn : global)[field] << value
-          locked_cn << entry if force_cn || forced_cn_entries.include?(entry)
-          locked_global << entry if force_global
-        end
-      end
-
-      priority = settings.fetch("priority", "cn")
-      raise "#{target}: priority must be cn or global" unless %w[cn global].include?(priority)
-      if priority == "global"
-        normalize_shadowing!(global, cn, locked_cn, target)
-      else
-        normalize_shadowing!(cn, global, locked_global, target)
-      end
-      validate_partition!(target, original, cn, global, priority)
-
-      File.write(File.join(output, "#{target}_CN.yaml"), dump_rule(target, "CN", sources, upstream_sha, no_resolve, cn))
-      File.write(File.join(output, "#{target}_Global.yaml"), dump_rule(target, "Global", sources, upstream_sha, no_resolve, global))
-      manifest_targets[target] = {
-        "sources" => sources,
-        "priority" => priority,
-        "cn_rules" => cn.values.sum(&:length),
-        "global_rules" => global.values.sum(&:length)
-      }
+    outputs.each do |name, fields|
+      File.write(File.join(output, "#{name}.yaml"), dump_rule(name, fields, output_sources.fetch(name)))
     end
 
     manifest = {
-      "upstream" => config.fetch("upstream").merge(
-        "commit" => upstream_sha,
-        "mirrored_rules" => upstream_rules.length
-      ),
-      "targets" => manifest_targets
+      "sources" => {
+        "v2fly" => { "url" => SOURCE_URLS.fetch("v2fly"), "sha256" => sha256(v2fly_path) },
+        "anti_ad" => { "url" => SOURCE_URLS.fetch("anti_ad"), "sha256" => sha256(anti_ad_path) },
+        "telegram" => { "url" => SOURCE_URLS.fetch("telegram"), "sha256" => sha256(telegram_path) }
+      },
+      "outputs" => outputs.transform_values { |fields| fields.values.sum(&:length) }
     }
     File.write(File.join(File.dirname(output), "manifest.yml"), YAML.dump(manifest))
     manifest
@@ -303,19 +260,17 @@ if $PROGRAM_NAME == __FILE__
       output: File.join(root, "generated", "Egern", "Rules")
     }
     OptionParser.new do |parser|
-      parser.banner = "Usage: ruby scripts/build.rb --source PATH [options]"
-      parser.on("--source PATH", "Repcz/Tool checkout") { |value| options[:source] = value }
-      parser.on("--config PATH", "Split configuration") { |value| options[:config_path] = value }
+      parser.banner = "Usage: ruby scripts/build.rb --v2fly FILE --anti-ad FILE --telegram FILE"
+      parser.on("--v2fly FILE", "v2fly dlc.dat_plain.yml") { |value| options[:v2fly_path] = value }
+      parser.on("--anti-ad FILE", "anti-AD Surge list") { |value| options[:anti_ad_path] = value }
+      parser.on("--telegram FILE", "Telegram official CIDR list") { |value| options[:telegram_path] = value }
+      parser.on("--config FILE", "Build configuration") { |value| options[:config_path] = value }
       parser.on("--output PATH", "Generated rules directory") { |value| options[:output] = value }
-      parser.on("--sha SHA", "Upstream commit for generated headers") { |value| options[:upstream_sha] = value }
     end.parse!
-    abort "--source is required" unless options[:source]
+    %i[v2fly_path anti_ad_path telegram_path].each { |key| abort "--#{key.to_s.tr('_', '-')} is required" unless options[key] }
 
-    manifest = SplitRules.build(**options)
-    puts "Mirrored rules: #{manifest.dig('upstream', 'mirrored_rules')}"
-    manifest.fetch("targets").each do |target, stats|
-      puts "#{target}: CN=#{stats['cn_rules']} Global=#{stats['global_rules']} priority=#{stats['priority']}"
-    end
+    manifest = EgernRules.build(**options)
+    manifest.fetch("outputs").each { |name, count| puts "#{name}: #{count}" }
   rescue KeyError, ArgumentError, RuntimeError => e
     warn e.message
     exit 1
