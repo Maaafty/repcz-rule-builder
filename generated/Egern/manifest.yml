@@ -2,7 +2,7 @@
 sources:
   v2fly:
     url: https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat_plain.yml
-    sha256: fe74e2665a8772eacf3ca6badf044b254bb12b8472e3da110ef1b6b90297bf5a
+    sha256: ca037ef34638c37d31cf02ee406873de0c25528d2ab3a152d191789cd7f30050
   anti_ad:
     url: https://raw.githubusercontent.com/privacy-protection-tools/anti-AD/master/anti-ad-surge.txt
     sha256: 7cd037c9feb0fb5523836fd5c0f236a963c68afc31f6643a56080f4d9f210855
@@ -14,7 +14,7 @@ outputs:
   Bilibili_Global: 4
   Game_CN: 312
   Game_Global: 791
-  Apple_CN: 291
+  Apple_CN: 294
   Apple_Global: 1484
   Microsoft_CN: 190
   Microsoft_Global: 502
@@ -24,6 +24,6 @@ outputs:
   Streaming: 510
   Telegram: 35
   Social: 489
-  ChinaDomain: 7833
+  ChinaDomain: 7876
   ChinaIP: 1
   Reject: 98196
