@@ -1,0 +1,4 @@
+# Manual force-DIRECT overrides.
+# Replace the placeholder after adding real rules; keep the file non-empty.
+domain_set:
+  - "manual-direct-placeholder.invalid"

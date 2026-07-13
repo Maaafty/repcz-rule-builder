@@ -132,8 +132,12 @@ module EgernRules
     end
   end
 
+  def rule_count(fields)
+    FIELD_ORDER.sum { |field| Array(fields[field]).length }
+  end
+
   def dump_rule(name, fields, sources, no_resolve: false)
-    count = fields.values.sum(&:length)
+    count = rule_count(fields)
     raise "#{name}: generated an empty rule set" if count.zero?
 
     lines = [
@@ -158,7 +162,23 @@ module EgernRules
     Digest::SHA256.file(path).hexdigest
   end
 
-  def build(config_path:, v2fly_path:, anti_ad_path:, telegram_path:, output:)
+  def copy_manual_rules(manual_path, output, reserved_names)
+    return {} unless manual_path && Dir.exist?(manual_path)
+
+    Dir[File.join(manual_path, "*.yaml")].sort.to_h do |path|
+      name = File.basename(path, ".yaml")
+      raise "#{name}: manual rule set conflicts with generated output" if reserved_names.include?(name)
+
+      data = load_yaml(path)
+      count = rule_count(data)
+      raise "#{name}: manual rule set is empty" if count.zero?
+
+      FileUtils.cp(path, File.join(output, "#{name}.yaml"))
+      [name, count]
+    end
+  end
+
+  def build(config_path:, v2fly_path:, anti_ad_path:, telegram_path:, output:, manual_path: nil)
     config = load_yaml(config_path)
     lists = parse_v2fly(v2fly_path)
     outputs = {}
@@ -245,6 +265,7 @@ module EgernRules
         dump_rule(name, fields, output_sources.fetch(name), no_resolve: no_resolve_outputs.include?(name))
       )
     end
+    manual_outputs = copy_manual_rules(manual_path, output, outputs.keys)
 
     manifest = {
       "sources" => {
@@ -252,7 +273,7 @@ module EgernRules
         "anti_ad" => { "url" => SOURCE_URLS.fetch("anti_ad"), "sha256" => sha256(anti_ad_path) },
         "telegram" => { "url" => SOURCE_URLS.fetch("telegram"), "sha256" => sha256(telegram_path) }
       },
-      "outputs" => outputs.transform_values { |fields| fields.values.sum(&:length) }
+      "outputs" => outputs.transform_values { |fields| rule_count(fields) }.merge(manual_outputs)
     }
     File.write(File.join(File.dirname(output), "manifest.yml"), YAML.dump(manifest))
     manifest
@@ -264,6 +285,7 @@ if $PROGRAM_NAME == __FILE__
     root = File.expand_path("..", __dir__)
     options = {
       config_path: File.join(root, "config", "splits.yml"),
+      manual_path: File.join(root, "manual", "Egern", "Rules"),
       output: File.join(root, "generated", "Egern", "Rules")
     }
     OptionParser.new do |parser|
@@ -272,6 +294,7 @@ if $PROGRAM_NAME == __FILE__
       parser.on("--anti-ad FILE", "anti-AD Surge list") { |value| options[:anti_ad_path] = value }
       parser.on("--telegram FILE", "Telegram official CIDR list") { |value| options[:telegram_path] = value }
       parser.on("--config FILE", "Build configuration") { |value| options[:config_path] = value }
+      parser.on("--manual PATH", "Manual rules directory") { |value| options[:manual_path] = value }
       parser.on("--output PATH", "Generated rules directory") { |value| options[:output] = value }
     end.parse!
     %i[v2fly_path anti_ad_path telegram_path].each { |key| abort "--#{key.to_s.tr('_', '-')} is required" unless options[key] }

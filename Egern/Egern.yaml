@@ -52,6 +52,14 @@ dns:
       value: reject
       disabled: false
   - proxy_rule_set:
+      match: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Egern/Rules/Manual_DNS_Domestic.yaml
+      value: Domestic-Encrypted-DNS
+      disabled: false
+  - proxy_rule_set:
+      match: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Egern/Rules/Manual_DNS_Foreign.yaml
+      value: Foreign-Encrypted-DNS
+      disabled: false
+  - proxy_rule_set:
       match: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Egern/Rules/ChinaDomain.yaml
       value: Domestic-Encrypted-DNS
       disabled: false
@@ -158,8 +166,14 @@ rules:
     policy: Proxy
     disabled: false
 - rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Egern/Rules/Manual_REJECT.yaml
+    policy: REJECT
+- rule_set:
     match: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Egern/Rules/Reject.yaml
     policy: REJECT
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Egern/Rules/Manual_DIRECT.yaml
+    policy: DIRECT
 - rule_set:
     match: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Egern/Rules/Bilibili_Global.yaml
     policy: Streaming
@@ -202,6 +216,9 @@ rules:
 - rule_set:
     match: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Egern/Rules/Google_Global.yaml
     policy: Google
+- rule_set:
+    match: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Egern/Rules/Manual_PROXY.yaml
+    policy: Proxy
 - rule_set:
     match: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Egern/Rules/ChinaDomain.yaml
     policy: DIRECT

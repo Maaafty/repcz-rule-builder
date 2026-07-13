@@ -27,3 +27,8 @@ outputs:
   ChinaDomain: 7931
   ChinaIP: 1
   Reject: 98800
+  Manual_DNS_Domestic: 1
+  Manual_DNS_Foreign: 1
+  Manual_DIRECT: 1
+  Manual_PROXY: 1
+  Manual_REJECT: 1

@@ -23,10 +23,24 @@
 - `Microsoft_CN.yaml` / `Microsoft_Global.yaml`
 - `Google_CN.yaml` / `Google_Global.yaml`
 - `AI.yaml` / `Streaming.yaml` / `Telegram.yaml` / `Social.yaml`
+- `Manual_DNS_Domestic.yaml` / `Manual_DNS_Foreign.yaml`
+- `Manual_DIRECT.yaml` / `Manual_PROXY.yaml` / `Manual_REJECT.yaml`
 
 不生成通用 CDN、下载、Proxy 或 Direct 规则。未知流量由 Egern 的 `Final` 策略处理。
 
 可导入配置位于 `Egern/Egern.yaml`。使用前需要替换 `Proxy` 中的订阅占位地址。
+
+## 手动规则
+
+手动维护的规则放在 `manual/Egern/Rules/`，构建时会复制到 `generated/Egern/Rules/`：
+
+- `Manual_DNS_Domestic.yaml`：强制使用国内加密 DNS
+- `Manual_DNS_Foreign.yaml`：强制使用国外加密 DNS
+- `Manual_DIRECT.yaml`：强制直连
+- `Manual_PROXY.yaml`：强制代理
+- `Manual_REJECT.yaml`：强制拦截
+
+不要把这些文件留空。当前模板使用 `.invalid` 占位域名保证 rule-set 有效；添加真实规则后可以删掉对应占位。
 
 ## 本地构建
 

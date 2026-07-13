@@ -1,0 +1,4 @@
+# Manual DNS domestic overrides.
+# Replace the placeholder after adding real rules; keep the file non-empty.
+domain_set:
+  - "manual-dns-domestic-placeholder.invalid"

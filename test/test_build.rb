@@ -57,6 +57,42 @@ class BuildTest < Minitest::Test
     assert_equal 17, manifest.fetch("outputs").length
   end
 
+  def test_copies_manual_rules
+    manual = File.join(@tmp, "manual", "Egern", "Rules")
+    FileUtils.mkdir_p(manual)
+    File.write(File.join(manual, "Manual_DIRECT.yaml"), "domain_set:\n  - manual.example\n")
+
+    manifest = EgernRules.build(
+      config_path: @config,
+      v2fly_path: @v2fly,
+      anti_ad_path: @anti_ad,
+      telegram_path: @telegram,
+      output: @output,
+      manual_path: manual
+    )
+
+    assert_equal ["manual.example"], rule("Manual_DIRECT").fetch("domain_set")
+    assert_equal 1, manifest.fetch("outputs").fetch("Manual_DIRECT")
+  end
+
+  def test_rejects_empty_manual_rules
+    manual = File.join(@tmp, "manual", "Egern", "Rules")
+    FileUtils.mkdir_p(manual)
+    File.write(File.join(manual, "Manual_DIRECT.yaml"), "# empty\n")
+
+    error = assert_raises(RuntimeError) do
+      EgernRules.build(
+        config_path: @config,
+        v2fly_path: @v2fly,
+        anti_ad_path: @anti_ad,
+        telegram_path: @telegram,
+        output: @output,
+        manual_path: manual
+      )
+    end
+    assert_match(/manual rule set is empty/, error.message)
+  end
+
   def test_rejects_a_priority_rule_that_shadows_the_other_region
     first = { "domain_suffix_set" => Set["example.com"] }
     second = { "domain_set" => Set["global.example.com"] }
@@ -67,21 +103,28 @@ class BuildTest < Minitest::Test
   def test_egern_config_references_every_generated_rule_once
     root = File.expand_path("..", __dir__)
     config = YAML.safe_load(File.read(File.join(root, "Egern", "Egern.yaml")), aliases: false)
-    referenced = config.fetch("rules").map do |rule|
+    rule_references = config.fetch("rules").map do |rule|
       item = rule["rule_set"]
       File.basename(item["match"], ".yaml") if item
     end.compact
+    dns_references = config.fetch("dns").fetch("forward").map do |rule|
+      item = rule["proxy_rule_set"]
+      File.basename(item["match"], ".yaml") if item
+    end.compact
+    referenced = (rule_references + dns_references).uniq
     generated = Dir[File.join(root, "generated", "Egern", "Rules", "*.yaml")].map do |path|
       File.basename(path, ".yaml")
     end
 
     assert_equal generated.sort, referenced.sort
-    assert_equal referenced.uniq, referenced
+    assert_equal rule_references.uniq, rule_references
     assert_equal %w[
-      Reject Bilibili_Global Bilibili_CN Game_CN Apple_CN Microsoft_CN Google_CN
+      Manual_REJECT Reject Manual_DIRECT Bilibili_Global Bilibili_CN Game_CN Apple_CN Microsoft_CN Google_CN
       AI Streaming Game_Global Telegram Social Apple_Global Microsoft_Global
-      Google_Global ChinaDomain ChinaIP
-    ], referenced
+      Google_Global Manual_PROXY ChinaDomain ChinaIP
+    ], rule_references
+    assert_includes dns_references, "Manual_DNS_Domestic"
+    assert_includes dns_references, "Manual_DNS_Foreign"
   end
 
   private
