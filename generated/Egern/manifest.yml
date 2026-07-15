@@ -2,7 +2,7 @@
 sources:
   v2fly:
     url: https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat_plain.yml
-    sha256: b1cf2e2951c153ee446f8b3f429ab74786cf1bb51a70e11f45dc0f115b425c19
+    sha256: 81b10d3728db78154150fe3d769f3075568082e9287b99aae3bdb2bfae80dda9
   anti_ad:
     url: https://raw.githubusercontent.com/privacy-protection-tools/anti-AD/master/anti-ad-surge.txt
     sha256: '0098e3059d97ebdc4c258bf31623834a8f0f40345cac7c51a339829dde951898'
@@ -24,7 +24,7 @@ outputs:
   Streaming: 510
   Telegram: 35
   Social: 489
-  ChinaDomain: 7933
+  ChinaDomain: 7941
   ChinaIP: 1
   Reject: 99433
   Manual_DIRECT: 2
