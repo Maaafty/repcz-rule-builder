@@ -2,7 +2,7 @@
 sources:
   v2fly:
     url: https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat_plain.yml
-    sha256: 81b10d3728db78154150fe3d769f3075568082e9287b99aae3bdb2bfae80dda9
+    sha256: e7c5f959ecbc8aa7317edde4cc7c18b6a4bdc7deb33f1c5f0c6b39818c3b2e16
   anti_ad:
     url: https://raw.githubusercontent.com/privacy-protection-tools/anti-AD/master/anti-ad-surge.txt
     sha256: '0098e3059d97ebdc4c258bf31623834a8f0f40345cac7c51a339829dde951898'
@@ -17,10 +17,10 @@ outputs:
   Apple_CN: 294
   Apple_Global: 1484
   Microsoft_CN: 190
-  Microsoft_Global: 502
+  Microsoft_Global: 504
   Google_CN: 126
   Google_Global: 774
-  AI: 160
+  AI: 162
   Streaming: 510
   Telegram: 35
   Social: 489
