@@ -75,6 +75,10 @@ class BuildTest < Minitest::Test
     assert_includes loon_rule("ChinaIP", "IP-CIDR"), "GEOIP,CN"
     assert_includes loon_rule("Streaming"),
       "URL-REGEX,^https?://(?:video\\S+\\.example\\.com)(?::[0-9]+)?(?:[/?#]|$)"
+    assert_includes loon_rule("Streaming"), "DOMAIN,asset0.example.com"
+    assert_includes loon_rule("Streaming"), "DOMAIN,asset9.example.com"
+    assert_includes loon_rule("Streaming"), "DOMAIN-SUFFIX,cdn1.example.net"
+    assert_includes loon_rule("Streaming"), "DOMAIN-SUFFIX,cdn2.example.net"
     refute File.exist?(File.join(@output, "OldMirror.yaml"))
     refute File.exist?(File.join(@mihomo_output, "OldMirror.yaml"))
     refute File.exist?(File.join(@loon_output, "Domain", "OldMirror.list"))
@@ -87,6 +91,7 @@ class BuildTest < Minitest::Test
     )
     assert_equal 1, loon_manifest.fetch("outputs").fetch("Domain/Telegram")
     assert_equal 2, loon_manifest.fetch("outputs").fetch("IP-CIDR/Telegram")
+    assert_equal 21, loon_manifest.fetch("outputs").fetch("Domain/Streaming")
     assert loon_rule("Telegram").all? { |line| line.match?(/\A(?:DOMAIN|URL-REGEX)/) }
     assert loon_rule("Telegram", "IP-CIDR").all? { |line| line.match?(/\A(?:GEOIP|IP-CIDR)/) }
     refute File.exist?(File.join(@loon_output, "IP-CIDR", "Bilibili_CN.list"))
@@ -125,6 +130,20 @@ class BuildTest < Minitest::Test
 
     assert_equal "^chatgpt-\\S+-\\d+\\.example\\.com$", regex.fetch("value")
     assert_equal "example.com", domain.fetch("value")
+  end
+
+  def test_expands_only_finite_loon_domain_regexes
+    exact = EgernRules.expand_loon_domain_regex("^asset\\d\\.example\\.com$")
+    suffix = EgernRules.expand_loon_domain_regex(".+\\.awsdns-cn-[0-9][a-e0-9]\\.cn$")
+
+    assert_equal "DOMAIN", exact.fetch("rule_type")
+    assert_equal 10, exact.fetch("values").length
+    assert_includes exact.fetch("values"), "asset9.example.com"
+    assert_equal "DOMAIN-SUFFIX", suffix.fetch("rule_type")
+    assert_equal 150, suffix.fetch("values").length
+    assert_includes suffix.fetch("values"), "awsdns-cn-0a.cn"
+    assert_nil EgernRules.expand_loon_domain_regex("^asset\\d+\\.example\\.com$")
+    assert_nil EgernRules.expand_loon_domain_regex("^asset[0-9][0-9][0-9][0-9]\\.example\\.com$")
   end
 
   def test_rejects_empty_manual_rules
@@ -240,9 +259,17 @@ class BuildTest < Minitest::Test
     ).fetch("outputs").each_with_object(Hash.new(0)) do |(path, count), counts|
       counts[path.split("/", 2).last] += count
     end
-    expected_loon_counts = egern_counts.reject do |name, _count|
-      %w[Manual_DNS_Domestic Manual_DNS_Foreign].include?(name)
-    end
+    expected_loon_counts = Dir[File.join(root, "generated", "Egern", "Rules", "*.yaml")]
+      .each_with_object({}) do |path, counts|
+        name = File.basename(path, ".yaml")
+        next if %w[Manual_DNS_Domestic Manual_DNS_Foreign].include?(name)
+
+        fields = YAML.safe_load(File.read(path), aliases: false)
+        counts[name] = EgernRules::LOON_RULE_FAMILIES.values.sum do |family_fields|
+          selected = EgernRules.select_fields(fields, family_fields)
+          EgernRules.loon_rule_lines(selected, no_resolve: fields["no_resolve"] == true).length
+        end
+      end
     assert_equal expected_loon_counts, loon_counts
     referenced_names = rule_references.map { |reference| reference.split("/", 2).last }.uniq
     assert_equal generated.sort, (referenced_names + %w[Manual_DNS_Domestic Manual_DNS_Foreign]).sort
@@ -292,7 +319,13 @@ class BuildTest < Minitest::Test
       "microsoft" => ["domain:microsoft.com", "domain:microsoft.cn:@cn"],
       "google" => ["domain:google.com", "domain:google.cn:@cn"],
       "category-ai-!cn" => ["domain:openai.com"],
-      "youtube" => ["domain:youtube.com", "domain:youtube.cn:@cn", "regexp:^video\\S+\\.example\\.com$"],
+      "youtube" => [
+        "domain:youtube.com",
+        "domain:youtube.cn:@cn",
+        "regexp:^video\\S+\\.example\\.com$",
+        "regexp:^asset\\d\\.example\\.com$",
+        "regexp:(^|\\.)cdn[1-2]\\.example\\.net$"
+      ],
       "netflix" => ["domain:netflix.com"],
       "disney" => ["domain:disneyplus.com"],
       "hbo" => ["domain:max.com"],

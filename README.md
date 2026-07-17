@@ -28,7 +28,7 @@
 
 Egern 输出使用 `domain_set`、`domain_suffix_set`、`ip_cidr_set` 等原生字段；Mihomo 输出使用 `behavior: classical` 所需的 `payload`；Loon 输出使用可直接订阅的 `.list` 规则。Loon 的 Domain 文件只包含 `DOMAIN`、`DOMAIN-SUFFIX`、`DOMAIN-KEYWORD` 和转换后的 `URL-REGEX`，IP-CIDR 文件只包含 `GEOIP`、`IP-CIDR` 与 `IP-CIDR6`。同时包含两类规则的集合（目前是 Telegram）会生成两个独立文件，并由模板分别引用。`Manual_DNS_Domestic` 与 `Manual_DNS_Foreign` 不会生成 Loon 文件。
 
-Loon 没有 `DOMAIN-REGEX`，构建器会把 v2fly 的域名正则转换为限定在 HTTP/HTTPS URL 主机部分的 `URL-REGEX`。因此这些少量正则无法覆盖非 HTTP 协议，其余规则保持等价。Loon 模板只配置全局 DNS，不生成插件模拟域名级 DNS 分流。
+Loon 没有 `DOMAIN-REGEX`。构建器会优先把能够有限枚举的正则展开为 `DOMAIN`，把能够有限枚举的动态后缀展开为 `DOMAIN-SUFFIX`；无法有限展开的规则才转换为限定在 HTTP/HTTPS URL 主机部分的 `URL-REGEX`。单条正则最多展开 1,000 项，超过上限时保留 `URL-REGEX`，避免规则数量失控。因此剩余的 URL 正则仍无法覆盖非 HTTP 协议。Loon 模板只配置全局 DNS，不生成插件模拟域名级 DNS 分流。
 
 不生成通用 CDN、下载、Proxy 或 Direct 规则。未知流量由客户端的 `Final` 策略处理。
 
@@ -68,7 +68,7 @@ ruby scripts/build.rb \
 ruby -Itest test/test_build.rb
 ```
 
-构建只使用 Ruby 标准库。每次运行都会清理三个客户端的旧规则文件，来源哈希和规则数量分别记录在各自 `generated/<Client>/manifest.yml`；Loon manifest 使用 `Domain/<名称>` 和 `IP-CIDR/<名称>` 标识拆分后的文件。
+构建只使用 Ruby 标准库。每次运行都会清理三个客户端的旧规则文件，来源哈希和实际输出规则数量分别记录在各自 `generated/<Client>/manifest.yml`；Loon manifest 使用 `Domain/<名称>` 和 `IP-CIDR/<名称>` 标识拆分后的文件，有限正则展开后数量可能高于 Egern/Mihomo。
 
 ## 自动更新
 

@@ -13,7 +13,7 @@ outputs:
   Domain/Bilibili_CN: 49
   Domain/Bilibili_Global: 4
   Domain/Game_CN: 318
-  Domain/Game_Global: 790
+  Domain/Game_Global: 799
   Domain/Apple_CN: 294
   Domain/Apple_Global: 1484
   Domain/Microsoft_CN: 190
@@ -21,11 +21,11 @@ outputs:
   Domain/Google_CN: 126
   Domain/Google_Global: 774
   Domain/AI: 162
-  Domain/Streaming: 510
+  Domain/Streaming: 517
   Domain/Telegram: 21
   IP-CIDR/Telegram: 14
   Domain/Social: 489
-  Domain/ChinaDomain: 7943
+  Domain/ChinaDomain: 8491
   IP-CIDR/ChinaIP: 1
   Domain/Reject: 99983
   Domain/Manual_DIRECT: 2
