@@ -14,8 +14,11 @@ class BuildTest < Minitest::Test
     @telegram = File.join(@tmp, "telegram.txt")
     @config = File.join(@tmp, "config.yml")
     @output = File.join(@tmp, "generated", "Egern", "Rules")
+    @mihomo_output = File.join(@tmp, "generated", "Mihomo", "Rules")
     FileUtils.mkdir_p(@output)
+    FileUtils.mkdir_p(@mihomo_output)
     File.write(File.join(@output, "OldMirror.yaml"), "domain_set:\n  - old.example\n")
+    File.write(File.join(@mihomo_output, "OldMirror.yaml"), "payload:\n  - DOMAIN,old.example\n")
 
     write_v2fly
     File.write(@anti_ad, "# anti-AD\nDOMAIN-SUFFIX,ads.example\nDOMAIN-SUFFIX,sub.ads.example\n")
@@ -33,7 +36,8 @@ class BuildTest < Minitest::Test
       v2fly_path: @v2fly,
       anti_ad_path: @anti_ad,
       telegram_path: @telegram,
-      output: @output
+      output: @output,
+      mihomo_output: @mihomo_output
     )
 
     bilibili_cn = rule("Bilibili_CN")
@@ -53,7 +57,13 @@ class BuildTest < Minitest::Test
     assert_equal ["ads.example"], rule("Reject").fetch("domain_suffix_set")
     assert_includes rule("Telegram").fetch("ip_cidr6_set"), "2001:b28:f23d::/48"
     assert_equal true, rule("Telegram").fetch("no_resolve")
+    assert_includes mihomo_rule("Bilibili_CN").fetch("payload"), "DOMAIN-SUFFIX,bilibili.com"
+    assert_includes mihomo_rule("Reject").fetch("payload"), "DOMAIN-SUFFIX,ads.example"
+    assert_includes mihomo_rule("Telegram").fetch("payload"), "IP-CIDR6,2001:b28:f23d::/48"
+    assert_includes mihomo_rule("ChinaIP").fetch("payload"), "GEOIP,CN"
     refute File.exist?(File.join(@output, "OldMirror.yaml"))
+    refute File.exist?(File.join(@mihomo_output, "OldMirror.yaml"))
+    assert File.exist?(File.join(@tmp, "generated", "Mihomo", "manifest.yml"))
     assert_equal 17, manifest.fetch("outputs").length
   end
 
@@ -68,10 +78,12 @@ class BuildTest < Minitest::Test
       anti_ad_path: @anti_ad,
       telegram_path: @telegram,
       output: @output,
-      manual_path: manual
+      manual_path: manual,
+      mihomo_output: @mihomo_output
     )
 
     assert_equal ["manual.example"], rule("Manual_DIRECT").fetch("domain_set")
+    assert_equal ["DOMAIN,manual.example"], mihomo_rule("Manual_DIRECT").fetch("payload")
     assert_equal 1, manifest.fetch("outputs").fetch("Manual_DIRECT")
   end
 
@@ -127,10 +139,46 @@ class BuildTest < Minitest::Test
     assert_includes dns_references, "Manual_DNS_Foreign"
   end
 
+  def test_mihomo_config_references_every_generated_rule
+    root = File.expand_path("..", __dir__)
+    config = YAML.safe_load(File.read(File.join(root, "Mihomo", "Mihomo.yaml")), aliases: false)
+    providers = config.fetch("rule-providers")
+    generated = Dir[File.join(root, "generated", "Egern", "Rules", "*.yaml")].map do |path|
+      File.basename(path, ".yaml")
+    end
+
+    rule_references = config.fetch("rules").each_with_object([]) do |rule, references|
+      parts = rule.split(",")
+      references << parts[1] if parts.first == "RULE-SET"
+    end
+    dns_references = config.fetch("dns").fetch("nameserver-policy").keys.each_with_object([]) do |selector, references|
+      references << selector.delete_prefix("rule-set:") if selector.start_with?("rule-set:")
+    end
+
+    assert_equal generated.sort, providers.keys.sort
+    assert_equal generated.sort, (rule_references + dns_references).uniq.sort
+    assert_equal rule_references.uniq, rule_references
+    assert_equal %w[
+      Manual_REJECT Reject Manual_DIRECT Bilibili_Global Bilibili_CN Game_CN Apple_CN Microsoft_CN Google_CN
+      AI Streaming Game_Global Telegram Social Apple_Global Microsoft_Global
+      Google_Global Manual_PROXY ChinaDomain ChinaIP
+    ], rule_references
+    providers.each do |name, provider|
+      assert_equal "classical", provider.fetch("behavior"), name
+      assert_equal "yaml", provider.fetch("format"), name
+      assert_match %r{/generated/Mihomo/Rules/#{Regexp.escape(name)}\.yaml\z}, provider.fetch("url"), name
+    end
+    assert_equal "AND,((NETWORK,UDP),(DST-PORT,443)),REJECT", config.fetch("rules").first
+  end
+
   private
 
   def rule(name)
     YAML.safe_load(File.read(File.join(@output, "#{name}.yaml")), aliases: false)
+  end
+
+  def mihomo_rule(name)
+    YAML.safe_load(File.read(File.join(@mihomo_output, "#{name}.yaml")), aliases: false)
   end
 
   def write_v2fly

@@ -1,4 +1,4 @@
-name: Build Egern rules
+name: Build Egern and Mihomo rules
 
 on:
   schedule:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: build-egern-rules
+  group: build-proxy-rules
   cancel-in-progress: true
 
 jobs:
@@ -44,5 +44,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add generated
-          git commit -m "build: update Egern rules"
+          git commit -m "build: update generated rules"
           git push

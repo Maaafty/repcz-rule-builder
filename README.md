@@ -1,19 +1,19 @@
-# Egern Rule Builder
+# Egern and Mihomo Rule Builder
 
-为 Egern 生成语义明确的国内外分流规则。项目不镜像其他配置仓库，只消费上游发布数据并转换成 Egern YAML。
+为 Egern 和 Mihomo 生成语义明确、同源的国内外分流规则。项目不镜像其他配置仓库，只消费上游发布数据并转换成对应客户端的 YAML。
 
 ## 数据源
 
 - v2fly/domain-list-community 官方 `dlc.dat_plain.yml`：域名与 `@cn` / `@!cn` 属性
 - privacy-protection-tools/anti-AD：广告拦截
 - Telegram 官方 CIDR：Telegram IP 路由
-- Loyalsoldier GeoIP：Egern 运行时中国 IP 判断
+- Loyalsoldier GeoIP：客户端运行时中国 IP 判断
 
 第三方来源和许可见 `THIRD_PARTY_NOTICES.md`。
 
 ## 输出
 
-`generated/Egern/Rules/` 只包含：
+`generated/Egern/Rules/` 和 `generated/Mihomo/Rules/` 包含同名、同数量的规则：
 
 - `Reject.yaml`
 - `ChinaDomain.yaml` / `ChinaIP.yaml`
@@ -26,13 +26,20 @@
 - `Manual_DNS_Domestic.yaml` / `Manual_DNS_Foreign.yaml`
 - `Manual_DIRECT.yaml` / `Manual_PROXY.yaml` / `Manual_REJECT.yaml`
 
-不生成通用 CDN、下载、Proxy 或 Direct 规则。未知流量由 Egern 的 `Final` 策略处理。
+Egern 输出使用 `domain_set`、`domain_suffix_set`、`ip_cidr_set` 等原生字段；Mihomo 输出使用 `behavior: classical` 所需的 `payload`，可同时容纳域名、GEOIP 和 CIDR 规则。
 
-可导入配置位于 `Egern/Egern.yaml`。使用前需要替换 `Proxy` 中的订阅占位地址。
+不生成通用 CDN、下载、Proxy 或 Direct 规则。未知流量由客户端的 `Final` 策略处理。
+
+可导入配置位于：
+
+- `Egern/Egern.yaml`
+- `Mihomo/Mihomo.yaml`
+
+使用前需要替换 `Proxy`/`Subscription` 中的订阅占位地址。Mihomo 不支持 Egern/Surge 的 `sgmodule`，因此模块不会写入 Mihomo 模板。
 
 ## 手动规则
 
-手动维护的规则放在 `manual/Egern/Rules/`，构建时会复制到 `generated/Egern/Rules/`：
+手动维护的规则放在 `manual/Egern/Rules/`。构建时会原样复制到 Egern 输出，并自动转换为 Mihomo classical rule-provider：
 
 - `Manual_DNS_Domestic.yaml`：强制使用国内加密 DNS
 - `Manual_DNS_Foreign.yaml`：强制使用国外加密 DNS
@@ -56,8 +63,8 @@ ruby scripts/build.rb \
 ruby -Itest test/test_build.rb
 ```
 
-构建只使用 Ruby 标准库。每次运行都会清理旧规则文件，来源哈希和规则数量记录在 `generated/Egern/manifest.yml`。
+构建只使用 Ruby 标准库。每次运行都会清理两个客户端的旧规则文件，来源哈希和规则数量分别记录在 `generated/Egern/manifest.yml` 和 `generated/Mihomo/manifest.yml`。
 
 ## 自动更新
 
-GitHub Actions 每天下载并校验 v2fly 发布产物，测试通过后更新 `generated/`。输出没有变化时不提交。
+GitHub Actions 每天下载并校验 v2fly 发布产物，测试通过后同时更新 Egern 与 Mihomo 的 `generated/`。输出没有变化时不提交。
