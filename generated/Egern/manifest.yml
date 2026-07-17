@@ -2,10 +2,10 @@
 sources:
   v2fly:
     url: https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat_plain.yml
-    sha256: e7c5f959ecbc8aa7317edde4cc7c18b6a4bdc7deb33f1c5f0c6b39818c3b2e16
+    sha256: ff4136d5681fc877b02d90048e76bc5870ec43e038925300159cb477f6fdf79f
   anti_ad:
     url: https://raw.githubusercontent.com/privacy-protection-tools/anti-AD/master/anti-ad-surge.txt
-    sha256: '0098e3059d97ebdc4c258bf31623834a8f0f40345cac7c51a339829dde951898'
+    sha256: 4040ae3caa2ffef887f6d799b2b4f9607794caa569cfb119fc899862464f903a
   telegram:
     url: https://core.telegram.org/resources/cidr.txt
     sha256: 3ecd072cedf72eceee6961b18a51e37f905d5ce4a656a5d24cf5fea63e6ec651
@@ -24,9 +24,9 @@ outputs:
   Streaming: 510
   Telegram: 35
   Social: 489
-  ChinaDomain: 7941
+  ChinaDomain: 7943
   ChinaIP: 1
-  Reject: 99433
+  Reject: 99983
   Manual_DIRECT: 2
   Manual_DNS_Domestic: 2
   Manual_DNS_Foreign: 1
