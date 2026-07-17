@@ -1,0 +1,364 @@
+# Generated for Maaafty/egern-rule-builder.
+# Replace the Subscription URL before starting Mihomo.
+# Egern/Surge sgmodule entries have no Mihomo equivalent and are intentionally omitted.
+
+port: 6152
+socks-port: 6153
+allow-lan: false
+mode: rule
+log-level: info
+ipv6: false
+
+profile:
+  store-selected: true
+  store-fake-ip: true
+
+tun:
+  enable: true
+  stack: mixed
+  auto-route: true
+  auto-detect-interface: true
+  strict-route: true
+  dns-hijack:
+    - any:53
+    - tcp://any:53
+  route-exclude-address:
+    - 10.33.0.0/16
+    - 10.66.0.0/16
+    - 100.64.0.0/10
+    - 127.0.0.0/8
+    - 169.254.0.0/16
+    - 172.16.0.0/12
+    - 192.0.0.0/24
+    - 192.0.2.0/24
+    - 192.168.0.0/16
+    - 198.51.100.0/24
+    - 203.0.113.0/24
+    - 224.0.0.0/4
+    - 255.255.255.255/32
+    - 8.137.110.69/32
+
+geodata-mode: false
+geo-auto-update: true
+geo-update-interval: 24
+geox-url:
+  mmdb: https://raw.githubusercontent.com/Loyalsoldier/geoip/release/Country-without-asn.mmdb
+
+hosts:
+  "*.maaafty.com": 69.63.210.33
+  maaafty.com: 69.63.210.33
+  dns.google:
+    - 8.8.8.8
+    - 8.8.4.4
+  cloudflare-dns.com:
+    - 104.16.249.249
+    - 104.16.248.249
+  dns.alidns.com:
+    - 223.5.5.5
+    - 223.6.6.6
+  doh.pub:
+    - 1.12.12.12
+    - 120.53.53.53
+
+dns:
+  enable: true
+  listen: 127.0.0.1:1053
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter-mode: blacklist
+  fake-ip-filter:
+    - "*.maaafty.com"
+    - lancache.steamcontent.com
+    - "*.msftconnecttest.com"
+    - "*.msftncsi.com"
+    - "*.srv.nintendo.net"
+    - "*.stun.playstation.net"
+    - xbox.*.microsoft.com
+    - "*.xboxlive.com"
+    - "*.logon.battlenet.com.cn"
+    - "*.logon.battle.net"
+    - stun.l.google.com
+    - "*.prod.cloud.netflix.com"
+    - appboot.netflix.com
+    - "*-appboot.netflix.com"
+  use-hosts: true
+  use-system-hosts: true
+  respect-rules: true
+  default-nameserver:
+    - 223.5.5.5
+    - 119.29.29.29
+  proxy-server-nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+  direct-nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+  direct-nameserver-follow-policy: true
+  nameserver:
+    - "https://cloudflare-dns.com/dns-query#Proxy"
+    - "https://dns.google/dns-query#Proxy"
+  nameserver-policy:
+    "rule-set:Reject": rcode://success
+    "rule-set:Manual_DNS_Domestic":
+      - https://dns.alidns.com/dns-query
+      - https://doh.pub/dns-query
+    "rule-set:Manual_DNS_Foreign":
+      - "https://cloudflare-dns.com/dns-query#Proxy"
+      - "https://dns.google/dns-query#Proxy"
+    "rule-set:ChinaDomain":
+      - https://dns.alidns.com/dns-query
+      - https://doh.pub/dns-query
+
+proxy-providers:
+  Subscription:
+    type: http
+    url: https://example.com/replace-with-your-subscription
+    path: ./proxy_providers/Subscription.yaml
+    interval: 86400
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 300
+      timeout: 5000
+      lazy: true
+      expected-status: 204
+
+proxy-groups:
+  - name: Proxy
+    type: select
+    use:
+      - Subscription
+  - name: Streaming
+    type: select
+    proxies:
+      - Proxy
+  - name: AI
+    type: select
+    proxies:
+      - Proxy
+  - name: Game
+    type: select
+    proxies:
+      - Proxy
+      - DIRECT
+  - name: Telegram
+    type: select
+    proxies:
+      - Proxy
+  - name: Social
+    type: select
+    proxies:
+      - Proxy
+  - name: Apple
+    type: select
+    proxies:
+      - Proxy
+      - DIRECT
+  - name: Microsoft
+    type: select
+    proxies:
+      - Proxy
+      - DIRECT
+  - name: Google
+    type: select
+    proxies:
+      - Proxy
+      - DIRECT
+  - name: Final
+    type: select
+    proxies:
+      - Proxy
+      - DIRECT
+
+rule-providers:
+  Bilibili_CN:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Bilibili_CN.yaml
+    path: ./rule_providers/Bilibili_CN.yaml
+    interval: 86400
+  Bilibili_Global:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Bilibili_Global.yaml
+    path: ./rule_providers/Bilibili_Global.yaml
+    interval: 86400
+  Game_CN:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Game_CN.yaml
+    path: ./rule_providers/Game_CN.yaml
+    interval: 86400
+  Game_Global:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Game_Global.yaml
+    path: ./rule_providers/Game_Global.yaml
+    interval: 86400
+  Apple_CN:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Apple_CN.yaml
+    path: ./rule_providers/Apple_CN.yaml
+    interval: 86400
+  Apple_Global:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Apple_Global.yaml
+    path: ./rule_providers/Apple_Global.yaml
+    interval: 86400
+  Microsoft_CN:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Microsoft_CN.yaml
+    path: ./rule_providers/Microsoft_CN.yaml
+    interval: 86400
+  Microsoft_Global:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Microsoft_Global.yaml
+    path: ./rule_providers/Microsoft_Global.yaml
+    interval: 86400
+  Google_CN:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Google_CN.yaml
+    path: ./rule_providers/Google_CN.yaml
+    interval: 86400
+  Google_Global:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Google_Global.yaml
+    path: ./rule_providers/Google_Global.yaml
+    interval: 86400
+  AI:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/AI.yaml
+    path: ./rule_providers/AI.yaml
+    interval: 86400
+  Streaming:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Streaming.yaml
+    path: ./rule_providers/Streaming.yaml
+    interval: 86400
+  Telegram:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Telegram.yaml
+    path: ./rule_providers/Telegram.yaml
+    interval: 86400
+  Social:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Social.yaml
+    path: ./rule_providers/Social.yaml
+    interval: 86400
+  ChinaDomain:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/ChinaDomain.yaml
+    path: ./rule_providers/ChinaDomain.yaml
+    interval: 86400
+  ChinaIP:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/ChinaIP.yaml
+    path: ./rule_providers/ChinaIP.yaml
+    interval: 86400
+  Reject:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Reject.yaml
+    path: ./rule_providers/Reject.yaml
+    interval: 86400
+  Manual_DIRECT:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Manual_DIRECT.yaml
+    path: ./rule_providers/Manual_DIRECT.yaml
+    interval: 86400
+  Manual_DNS_Domestic:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Manual_DNS_Domestic.yaml
+    path: ./rule_providers/Manual_DNS_Domestic.yaml
+    interval: 86400
+  Manual_DNS_Foreign:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Manual_DNS_Foreign.yaml
+    path: ./rule_providers/Manual_DNS_Foreign.yaml
+    interval: 86400
+  Manual_PROXY:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Manual_PROXY.yaml
+    path: ./rule_providers/Manual_PROXY.yaml
+    interval: 86400
+  Manual_REJECT:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://raw.githubusercontent.com/Maaafty/egern-rule-builder/main/generated/Mihomo/Rules/Manual_REJECT.yaml
+    path: ./rule_providers/Manual_REJECT.yaml
+    interval: 86400
+
+rules:
+  # Mihomo has no block_quic switch; reject UDP/443 to force TCP fallback.
+  - AND,((NETWORK,UDP),(DST-PORT,443)),REJECT
+  - DOMAIN-SUFFIX,maaafty.com,DIRECT
+  - DOMAIN,cloudflare-dns.com,Proxy
+  - DOMAIN,dns.google,Proxy
+  - RULE-SET,Manual_REJECT,REJECT
+  - RULE-SET,Reject,REJECT
+  - RULE-SET,Manual_DIRECT,DIRECT
+  - RULE-SET,Bilibili_Global,Streaming
+  - RULE-SET,Bilibili_CN,DIRECT
+  - RULE-SET,Game_CN,DIRECT
+  - RULE-SET,Apple_CN,DIRECT
+  - RULE-SET,Microsoft_CN,DIRECT
+  - RULE-SET,Google_CN,DIRECT
+  - RULE-SET,AI,AI
+  - RULE-SET,Streaming,Streaming
+  - RULE-SET,Game_Global,Game
+  - RULE-SET,Telegram,Telegram,no-resolve
+  - RULE-SET,Social,Social
+  - RULE-SET,Apple_Global,Apple
+  - RULE-SET,Microsoft_Global,Microsoft
+  - RULE-SET,Google_Global,Google
+  - RULE-SET,Manual_PROXY,Proxy
+  - RULE-SET,ChinaDomain,DIRECT
+  - RULE-SET,ChinaIP,DIRECT,no-resolve
+  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
+  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
+  - IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
+  - DOMAIN,localhost,DIRECT
+  - DOMAIN-SUFFIX,local,DIRECT
+  - DOMAIN,passenger.t3go.cn,DIRECT
+  - MATCH,Final
