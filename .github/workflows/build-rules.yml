@@ -1,4 +1,4 @@
-name: Build Egern and Mihomo rules
+name: Build Egern, Mihomo, and Loon rules
 
 on:
   schedule:
