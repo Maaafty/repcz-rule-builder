@@ -15,10 +15,16 @@ class BuildTest < Minitest::Test
     @config = File.join(@tmp, "config.yml")
     @output = File.join(@tmp, "generated", "Egern", "Rules")
     @mihomo_output = File.join(@tmp, "generated", "Mihomo", "Rules")
+    @loon_output = File.join(@tmp, "generated", "Loon", "Rules")
     FileUtils.mkdir_p(@output)
     FileUtils.mkdir_p(@mihomo_output)
+    FileUtils.mkdir_p(File.join(@loon_output, "Domain"))
+    FileUtils.mkdir_p(File.join(@tmp, "generated", "Loon", "Plugins"))
     File.write(File.join(@output, "OldMirror.yaml"), "domain_set:\n  - old.example\n")
     File.write(File.join(@mihomo_output, "OldMirror.yaml"), "payload:\n  - DOMAIN,old.example\n")
+    File.write(File.join(@loon_output, "Domain", "OldMirror.list"), "DOMAIN,old.example\n")
+    File.write(File.join(@loon_output, "OldLegacy.list"), "DOMAIN,old.example\n")
+    File.write(File.join(@tmp, "generated", "Loon", "Plugins", "DNS.plugin"), "stale\n")
 
     write_v2fly
     File.write(@anti_ad, "# anti-AD\nDOMAIN-SUFFIX,ads.example\nDOMAIN-SUFFIX,sub.ads.example\n")
@@ -37,7 +43,8 @@ class BuildTest < Minitest::Test
       anti_ad_path: @anti_ad,
       telegram_path: @telegram,
       output: @output,
-      mihomo_output: @mihomo_output
+      mihomo_output: @mihomo_output,
+      loon_output: @loon_output
     )
 
     bilibili_cn = rule("Bilibili_CN")
@@ -61,9 +68,33 @@ class BuildTest < Minitest::Test
     assert_includes mihomo_rule("Reject").fetch("payload"), "DOMAIN-SUFFIX,ads.example"
     assert_includes mihomo_rule("Telegram").fetch("payload"), "IP-CIDR6,2001:b28:f23d::/48"
     assert_includes mihomo_rule("ChinaIP").fetch("payload"), "GEOIP,CN"
+    assert_includes loon_rule("Bilibili_CN"), "DOMAIN-SUFFIX,bilibili.com"
+    assert_includes loon_rule("Reject"), "DOMAIN-SUFFIX,ads.example"
+    assert_includes loon_rule("Telegram"), "DOMAIN-SUFFIX,telegram.org"
+    assert_includes loon_rule("Telegram", "IP-CIDR"), "IP-CIDR6,2001:b28:f23d::/48,no-resolve"
+    assert_includes loon_rule("ChinaIP", "IP-CIDR"), "GEOIP,CN"
+    assert_includes loon_rule("Streaming"),
+      "URL-REGEX,^https?://(?:video\\S+\\.example\\.com)(?::[0-9]+)?(?:[/?#]|$)"
+    assert_includes loon_rule("Streaming"), "DOMAIN,asset0.example.com"
+    assert_includes loon_rule("Streaming"), "DOMAIN,asset9.example.com"
+    assert_includes loon_rule("Streaming"), "DOMAIN-SUFFIX,cdn1.example.net"
+    assert_includes loon_rule("Streaming"), "DOMAIN-SUFFIX,cdn2.example.net"
     refute File.exist?(File.join(@output, "OldMirror.yaml"))
     refute File.exist?(File.join(@mihomo_output, "OldMirror.yaml"))
+    refute File.exist?(File.join(@loon_output, "Domain", "OldMirror.list"))
+    refute File.exist?(File.join(@loon_output, "OldLegacy.list"))
+    refute File.exist?(File.join(@tmp, "generated", "Loon", "Plugins", "DNS.plugin"))
     assert File.exist?(File.join(@tmp, "generated", "Mihomo", "manifest.yml"))
+    assert File.exist?(File.join(@tmp, "generated", "Loon", "manifest.yml"))
+    loon_manifest = YAML.safe_load(
+      File.read(File.join(@tmp, "generated", "Loon", "manifest.yml")), aliases: false
+    )
+    assert_equal 1, loon_manifest.fetch("outputs").fetch("Domain/Telegram")
+    assert_equal 2, loon_manifest.fetch("outputs").fetch("IP-CIDR/Telegram")
+    assert_equal 21, loon_manifest.fetch("outputs").fetch("Domain/Streaming")
+    assert loon_rule("Telegram").all? { |line| line.match?(/\A(?:DOMAIN|URL-REGEX)/) }
+    assert loon_rule("Telegram", "IP-CIDR").all? { |line| line.match?(/\A(?:GEOIP|IP-CIDR)/) }
+    refute File.exist?(File.join(@loon_output, "IP-CIDR", "Bilibili_CN.list"))
     assert_equal 17, manifest.fetch("outputs").length
   end
 
@@ -71,6 +102,7 @@ class BuildTest < Minitest::Test
     manual = File.join(@tmp, "manual", "Egern", "Rules")
     FileUtils.mkdir_p(manual)
     File.write(File.join(manual, "Manual_DIRECT.yaml"), "domain_set:\n  - manual.example\n")
+    File.write(File.join(manual, "Manual_DNS_Domestic.yaml"), "domain_set:\n  - dns.example\n")
 
     manifest = EgernRules.build(
       config_path: @config,
@@ -79,12 +111,39 @@ class BuildTest < Minitest::Test
       telegram_path: @telegram,
       output: @output,
       manual_path: manual,
-      mihomo_output: @mihomo_output
+      mihomo_output: @mihomo_output,
+      loon_output: @loon_output
     )
 
     assert_equal ["manual.example"], rule("Manual_DIRECT").fetch("domain_set")
+    assert_equal ["dns.example"], rule("Manual_DNS_Domestic").fetch("domain_set")
     assert_equal ["DOMAIN,manual.example"], mihomo_rule("Manual_DIRECT").fetch("payload")
+    assert_equal ["DOMAIN,dns.example"], mihomo_rule("Manual_DNS_Domestic").fetch("payload")
+    assert_equal ["DOMAIN,manual.example"], loon_rule("Manual_DIRECT")
+    refute File.exist?(File.join(@loon_output, "Domain", "Manual_DNS_Domestic.list"))
     assert_equal 1, manifest.fetch("outputs").fetch("Manual_DIRECT")
+  end
+
+  def test_preserves_regex_case_while_normalizing_domains
+    regex = EgernRules.parse_v2fly_rule("regexp:^chatgpt-\\S+-\\d+\\.example\\.com$")
+    domain = EgernRules.parse_v2fly_rule("domain:Example.COM")
+
+    assert_equal "^chatgpt-\\S+-\\d+\\.example\\.com$", regex.fetch("value")
+    assert_equal "example.com", domain.fetch("value")
+  end
+
+  def test_expands_only_finite_loon_domain_regexes
+    exact = EgernRules.expand_loon_domain_regex("^asset\\d\\.example\\.com$")
+    suffix = EgernRules.expand_loon_domain_regex(".+\\.awsdns-cn-[0-9][a-e0-9]\\.cn$")
+
+    assert_equal "DOMAIN", exact.fetch("rule_type")
+    assert_equal 10, exact.fetch("values").length
+    assert_includes exact.fetch("values"), "asset9.example.com"
+    assert_equal "DOMAIN-SUFFIX", suffix.fetch("rule_type")
+    assert_equal 150, suffix.fetch("values").length
+    assert_includes suffix.fetch("values"), "awsdns-cn-0a.cn"
+    assert_nil EgernRules.expand_loon_domain_regex("^asset\\d+\\.example\\.com$")
+    assert_nil EgernRules.expand_loon_domain_regex("^asset[0-9][0-9][0-9][0-9]\\.example\\.com$")
   end
 
   def test_rejects_empty_manual_rules
@@ -171,7 +230,71 @@ class BuildTest < Minitest::Test
     assert_equal "AND,((NETWORK,UDP),(DST-PORT,443)),REJECT", config.fetch("rules").first
   end
 
+  def test_loon_config_references_every_routing_rule
+    root = File.expand_path("..", __dir__)
+    config = File.read(File.join(root, "Loon", "Loon.conf"))
+    generated = Dir[File.join(root, "generated", "Egern", "Rules", "*.yaml")].map do |path|
+      File.basename(path, ".yaml")
+    end
+    remote_rules = section_lines(config, "Remote Rule")
+    rule_references = remote_rules.map do |line|
+      line.split("/generated/Loon/Rules/", 2).last.split(",", 2).first.delete_suffix(".list")
+    end
+
+    assert_equal %w[
+      Domain/Manual_REJECT Domain/Reject Domain/Manual_DIRECT Domain/Bilibili_Global Domain/Bilibili_CN
+      Domain/Game_CN Domain/Apple_CN Domain/Microsoft_CN Domain/Google_CN Domain/AI Domain/Streaming
+      Domain/Game_Global Domain/Telegram IP-CIDR/Telegram Domain/Social Domain/Apple_Global
+      Domain/Microsoft_Global Domain/Google_Global Domain/Manual_PROXY Domain/ChinaDomain IP-CIDR/ChinaIP
+    ], rule_references
+    generated_loon = Dir[File.join(root, "generated", "Loon", "Rules", "**", "*.list")].map do |path|
+      path.delete_prefix(File.join(root, "generated", "Loon", "Rules") + "/").delete_suffix(".list")
+    end
+    assert_equal generated_loon.sort, rule_references.sort
+    egern_counts = YAML.safe_load(
+      File.read(File.join(root, "generated", "Egern", "manifest.yml")), aliases: false
+    ).fetch("outputs")
+    loon_counts = YAML.safe_load(
+      File.read(File.join(root, "generated", "Loon", "manifest.yml")), aliases: false
+    ).fetch("outputs").each_with_object(Hash.new(0)) do |(path, count), counts|
+      counts[path.split("/", 2).last] += count
+    end
+    expected_loon_counts = Dir[File.join(root, "generated", "Egern", "Rules", "*.yaml")]
+      .each_with_object({}) do |path, counts|
+        name = File.basename(path, ".yaml")
+        next if %w[Manual_DNS_Domestic Manual_DNS_Foreign].include?(name)
+
+        fields = YAML.safe_load(File.read(path), aliases: false)
+        counts[name] = EgernRules::LOON_RULE_FAMILIES.values.sum do |family_fields|
+          selected = EgernRules.select_fields(fields, family_fields)
+          EgernRules.loon_rule_lines(selected, no_resolve: fields["no_resolve"] == true).length
+        end
+      end
+    assert_equal expected_loon_counts, loon_counts
+    referenced_names = rule_references.map { |reference| reference.split("/", 2).last }.uniq
+    assert_equal generated.sort, (referenced_names + %w[Manual_DNS_Domestic Manual_DNS_Foreign]).sort
+    assert_equal %w[Telegram], rule_references.group_by { |reference| reference.split("/", 2).last }
+      .select { |_name, references| references.length > 1 }.keys
+    assert_equal remote_rules.length, remote_rules.map { |line| line[/tag=([^,]+)/, 1] }.uniq.length
+    assert_includes section_lines(config, "General"), "disable-udp-ports = 443"
+    assert_includes section_lines(config, "General"), "wifi-access-socks5-port = 6153"
+    refute_includes config, "[Plugin]"
+    assert_equal %w[Proxy Streaming AI Game Telegram Social Apple Microsoft Google Final],
+      section_lines(config, "Proxy Group").map { |line| line.split("=", 2).first.strip }
+  end
+
   private
+
+  def section_lines(config, section)
+    active = false
+    config.lines(chomp: true).each_with_object([]) do |line, lines|
+      if line.start_with?("[")
+        active = line == "[#{section}]"
+      elsif active && !line.empty? && !line.start_with?("#")
+        lines << line
+      end
+    end
+  end
 
   def rule(name)
     YAML.safe_load(File.read(File.join(@output, "#{name}.yaml")), aliases: false)
@@ -179,6 +302,12 @@ class BuildTest < Minitest::Test
 
   def mihomo_rule(name)
     YAML.safe_load(File.read(File.join(@mihomo_output, "#{name}.yaml")), aliases: false)
+  end
+
+  def loon_rule(name, family = "Domain")
+    File.readlines(File.join(@loon_output, family, "#{name}.list"), chomp: true).reject do |line|
+      line.empty? || line.start_with?("#")
+    end
   end
 
   def write_v2fly
@@ -190,7 +319,13 @@ class BuildTest < Minitest::Test
       "microsoft" => ["domain:microsoft.com", "domain:microsoft.cn:@cn"],
       "google" => ["domain:google.com", "domain:google.cn:@cn"],
       "category-ai-!cn" => ["domain:openai.com"],
-      "youtube" => ["domain:youtube.com", "domain:youtube.cn:@cn"],
+      "youtube" => [
+        "domain:youtube.com",
+        "domain:youtube.cn:@cn",
+        "regexp:^video\\S+\\.example\\.com$",
+        "regexp:^asset\\d\\.example\\.com$",
+        "regexp:(^|\\.)cdn[1-2]\\.example\\.net$"
+      ],
       "netflix" => ["domain:netflix.com"],
       "disney" => ["domain:disneyplus.com"],
       "hbo" => ["domain:max.com"],

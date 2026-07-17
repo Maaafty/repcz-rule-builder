@@ -164,4 +164,4 @@ payload:
   - "DOMAIN-SUFFIX,youmind.ai"
   - "DOMAIN-SUFFIX,youmind.com"
   - "DOMAIN-SUFFIX,youmind.site"
-  - "DOMAIN-REGEX,^chatgpt-async-webps-prod-\\s+-\\d+\\.webpubsub\\.azure\\.com$"
+  - "DOMAIN-REGEX,^chatgpt-async-webps-prod-\\S+-\\d+\\.webpubsub\\.azure\\.com$"

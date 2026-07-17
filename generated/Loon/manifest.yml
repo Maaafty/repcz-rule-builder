@@ -1,0 +1,33 @@
+---
+sources:
+  v2fly:
+    url: https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat_plain.yml
+    sha256: ff4136d5681fc877b02d90048e76bc5870ec43e038925300159cb477f6fdf79f
+  anti_ad:
+    url: https://raw.githubusercontent.com/privacy-protection-tools/anti-AD/master/anti-ad-surge.txt
+    sha256: 4040ae3caa2ffef887f6d799b2b4f9607794caa569cfb119fc899862464f903a
+  telegram:
+    url: https://core.telegram.org/resources/cidr.txt
+    sha256: 3ecd072cedf72eceee6961b18a51e37f905d5ce4a656a5d24cf5fea63e6ec651
+outputs:
+  Domain/Bilibili_CN: 49
+  Domain/Bilibili_Global: 4
+  Domain/Game_CN: 318
+  Domain/Game_Global: 799
+  Domain/Apple_CN: 294
+  Domain/Apple_Global: 1484
+  Domain/Microsoft_CN: 190
+  Domain/Microsoft_Global: 504
+  Domain/Google_CN: 126
+  Domain/Google_Global: 774
+  Domain/AI: 162
+  Domain/Streaming: 517
+  Domain/Telegram: 21
+  IP-CIDR/Telegram: 14
+  Domain/Social: 489
+  Domain/ChinaDomain: 8491
+  IP-CIDR/ChinaIP: 1
+  Domain/Reject: 99983
+  Domain/Manual_DIRECT: 2
+  Domain/Manual_PROXY: 1
+  Domain/Manual_REJECT: 1

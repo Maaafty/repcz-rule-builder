@@ -28,6 +28,21 @@ module EgernRules
     "ip_cidr_set" => "IP-CIDR",
     "ip_cidr6_set" => "IP-CIDR6"
   }.freeze
+  LOON_RULE_TYPES = {
+    "domain_set" => "DOMAIN",
+    "domain_keyword_set" => "DOMAIN-KEYWORD",
+    "domain_suffix_set" => "DOMAIN-SUFFIX",
+    "geoip_set" => "GEOIP",
+    "ip_cidr_set" => "IP-CIDR",
+    "ip_cidr6_set" => "IP-CIDR6"
+  }.freeze
+  LOON_NO_RESOLVE_FIELDS = %w[geoip_set ip_cidr_set ip_cidr6_set].freeze
+  LOON_RULE_FAMILIES = {
+    "Domain" => %w[domain_set domain_keyword_set domain_suffix_set domain_regex_set],
+    "IP-CIDR" => %w[geoip_set ip_cidr_set ip_cidr6_set]
+  }.freeze
+  LOON_REGEX_EXPANSION_LIMIT = 1_000
+  LOON_EXCLUDED_MANUAL_OUTPUTS = %w[Manual_DNS_Domestic Manual_DNS_Foreign].freeze
   SOURCE_URLS = {
     "v2fly" => "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat_plain.yml",
     "anti_ad" => "https://raw.githubusercontent.com/privacy-protection-tools/anti-AD/master/anti-ad-surge.txt",
@@ -60,9 +75,11 @@ module EgernRules
     type = parts.shift
     tags = []
     tags.unshift(parts.pop.delete_prefix("@")) while parts.last&.start_with?("@")
-    value = parts.join(":").strip.downcase
+    value = parts.join(":").strip
     raise "Unsupported v2fly rule type: #{type}" unless TYPE_FIELDS.key?(type)
     raise "Empty v2fly rule: #{line}" if value.empty?
+
+    value = value.downcase unless type == "regexp"
 
     { "field" => TYPE_FIELDS.fetch(type), "value" => value, "tags" => Set.new(tags) }
   end
@@ -145,6 +162,12 @@ module EgernRules
     FIELD_ORDER.sum { |field| Array(fields[field]).length }
   end
 
+  def select_fields(fields, selected_fields)
+    selected_fields.to_h do |field|
+      [field, fields[field]]
+    end.reject { |_field, values| values.nil? || values.empty? }
+  end
+
   def dump_rule(name, fields, sources, no_resolve: false)
     count = rule_count(fields)
     raise "#{name}: generated an empty rule set" if count.zero?
@@ -183,6 +206,158 @@ module EgernRules
         lines << "  - #{JSON.generate("#{MIHOMO_RULE_TYPES.fetch(field)},#{value}")}"
       end
     end
+    lines.join("\n") + "\n"
+  end
+
+  def loon_url_regex(value)
+    suffix_aware = value.start_with?("(^|\\.)")
+    anchored = value.start_with?("^")
+    body = value.delete_prefix("(^|\\.)").delete_prefix("^").delete_suffix("$")
+    prefix = suffix_aware || !anchored ? "(?:[^/?#]+\\.)*" : ""
+    "^https?://#{prefix}(?:#{body})(?::[0-9]+)?(?:[/?#]|$)"
+  end
+
+  def expand_loon_character_class(value)
+    return nil if value.empty? || value.start_with?("^") || value.include?("\\")
+
+    characters = value.chars
+    expanded = []
+    index = 0
+    while index < characters.length
+      if index + 2 < characters.length && characters[index + 1] == "-"
+        first = characters[index].ord
+        last = characters[index + 2].ord
+        return nil if first > last
+
+        expanded.concat((first..last).map(&:chr))
+        index += 3
+      else
+        expanded << characters[index]
+        index += 1
+      end
+    end
+    expanded.uniq
+  end
+
+  def replace_loon_regex_fragment(value, match, replacements)
+    prefix = value[0...match.begin(0)]
+    suffix = value[match.end(0)..]
+    replacements.map { |replacement| "#{prefix}#{replacement}#{suffix}" }
+  end
+
+  def literal_domain_from_regex(value)
+    literal = +""
+    escaped = false
+    value.each_char do |character|
+      if escaped
+        return nil unless %w[. -].include?(character)
+
+        literal << character
+        escaped = false
+      elsif character == "\\"
+        escaped = true
+      elsif character.match?(/[A-Za-z0-9_-]/)
+        literal << character
+      else
+        return nil
+      end
+    end
+    return nil if escaped || literal.empty? || literal.start_with?(".") || literal.end_with?(".") || literal.include?("..")
+
+    literal
+  end
+
+  def expand_finite_domain_regex(value, limit: LOON_REGEX_EXPANSION_LIMIT)
+    pending = [value]
+    expanded = []
+    until pending.empty?
+      current = pending.shift
+      if (match = current.match(/\(([^()]*)\)(\?)?/))
+        choices = match[1].split("|", -1)
+        choices << "" if match[2]
+        replacements = replace_loon_regex_fragment(current, match, choices)
+      elsif (match = current.match(/\[([^\]]+)\](\?)?/))
+        choices = expand_loon_character_class(match[1])
+        return nil unless choices
+
+        choices << "" if match[2]
+        replacements = replace_loon_regex_fragment(current, match, choices)
+      elsif (match = current.match(/\\d(\?)?/))
+        choices = ("0".."9").to_a
+        choices << "" if match[1]
+        replacements = replace_loon_regex_fragment(current, match, choices)
+      else
+        literal = literal_domain_from_regex(current)
+        return nil unless literal
+
+        expanded << literal
+        next
+      end
+
+      return nil if pending.length + expanded.length + replacements.length > limit
+
+      pending.concat(replacements)
+    end
+    expanded.uniq.sort
+  end
+
+  def expand_loon_domain_regex(value)
+    return nil unless value.end_with?("$")
+
+    if value.start_with?("(^|\\.)")
+      rule_type = "DOMAIN-SUFFIX"
+      body = value.delete_prefix("(^|\\.)").delete_suffix("$")
+    elsif value.start_with?(".+\\.")
+      rule_type = "DOMAIN-SUFFIX"
+      body = value.delete_prefix(".+\\.").delete_suffix("$")
+    elsif value.start_with?("^")
+      rule_type = "DOMAIN"
+      body = value.delete_prefix("^").delete_suffix("$")
+    else
+      return nil
+    end
+
+    values = expand_finite_domain_regex(body)
+    values && { "rule_type" => rule_type, "values" => values }
+  end
+
+  def loon_rule_lines(fields, no_resolve: false)
+    lines = []
+    FIELD_ORDER.each do |field|
+      Array(fields[field]).sort.each do |value|
+        if field == "domain_regex_set"
+          expansion = expand_loon_domain_regex(value)
+          if expansion
+            expansion.fetch("values").each do |domain|
+              lines << "#{expansion.fetch('rule_type')},#{domain}"
+            end
+          else
+            regex = loon_url_regex(value)
+            raise "Loon URL regex contains an unsupported comma" if regex.include?(",")
+
+            lines << "URL-REGEX,#{regex}"
+          end
+        else
+          rule = "#{LOON_RULE_TYPES.fetch(field)},#{value}"
+          rule += ",no-resolve" if no_resolve && LOON_NO_RESOLVE_FIELDS.include?(field)
+          lines << rule
+        end
+      end
+    end
+    lines.uniq
+  end
+
+  def dump_loon_rule(name, fields, sources, no_resolve: false, rule_lines: nil)
+    rule_lines ||= loon_rule_lines(fields, no_resolve: no_resolve)
+    raise "#{name}: generated an empty rule set" if rule_lines.empty?
+
+    lines = [
+      "# Generated by egern-rule-builder",
+      "# Sources: #{sources.join(', ')}",
+      "# Rule count: #{rule_lines.length}",
+      ""
+    ]
+    lines.concat(rule_lines)
     lines.join("\n") + "\n"
   end
 
@@ -233,7 +408,67 @@ module EgernRules
     end
   end
 
-  def build(config_path:, v2fly_path:, anti_ad_path:, telegram_path:, output:, manual_path: nil, mihomo_output: nil)
+  def write_loon_rule_files(output, name, fields, sources, no_resolve: false)
+    LOON_RULE_FAMILIES.each_with_object({}) do |(family, family_fields), counts|
+      selected = select_fields(fields, family_fields)
+      next if rule_count(selected).zero?
+
+      family_output = File.join(output, family)
+      FileUtils.mkdir_p(family_output)
+      rule_lines = loon_rule_lines(selected, no_resolve: no_resolve)
+      File.write(
+        File.join(family_output, "#{name}.list"),
+        dump_loon_rule(name, selected, sources, no_resolve: no_resolve, rule_lines: rule_lines)
+      )
+      counts["#{family}/#{name}"] = rule_lines.length
+    end
+  end
+
+  def write_loon_rules(output:, generated_outputs:, output_sources:, manual_path:, reserved_names:, no_resolve_outputs:)
+    FileUtils.mkdir_p(output)
+    Dir[File.join(output, "**", "*.list")].each { |path| FileUtils.rm_f(path) }
+
+    loon_outputs = generated_outputs.each_with_object({}) do |(name, fields), counts|
+      counts.merge!(
+        write_loon_rule_files(
+          output,
+          name,
+          fields,
+          output_sources.fetch(name),
+          no_resolve: no_resolve_outputs.include?(name)
+        )
+      )
+    end
+
+    if manual_path && Dir.exist?(manual_path)
+      Dir[File.join(manual_path, "*.yaml")].sort.each do |path|
+        name = File.basename(path, ".yaml")
+        raise "#{name}: manual rule set conflicts with generated output" if reserved_names.include?(name)
+        next if LOON_EXCLUDED_MANUAL_OUTPUTS.include?(name)
+
+        fields = load_yaml(path)
+        raise "#{name}: manual rule set is empty" if rule_count(fields).zero?
+
+        loon_outputs.merge!(
+          write_loon_rule_files(
+            output,
+            name,
+            fields,
+            ["manual:Egern/Rules/#{File.basename(path)}"]
+          )
+        )
+      end
+    end
+
+    plugin_path = File.join(File.dirname(output), "Plugins", "DNS.plugin")
+    FileUtils.rm_f(plugin_path)
+    loon_outputs
+  end
+
+  def build(
+    config_path:, v2fly_path:, anti_ad_path:, telegram_path:, output:, manual_path: nil,
+    mihomo_output: nil, loon_output: nil
+  )
     config = load_yaml(config_path)
     lists = parse_v2fly(v2fly_path)
     outputs = {}
@@ -342,6 +577,18 @@ module EgernRules
       )
       File.write(File.join(File.dirname(mihomo_output), "manifest.yml"), YAML.dump(manifest))
     end
+    if loon_output
+      loon_outputs = write_loon_rules(
+        output: loon_output,
+        generated_outputs: outputs,
+        output_sources: output_sources,
+        manual_path: manual_path,
+        reserved_names: outputs.keys,
+        no_resolve_outputs: no_resolve_outputs
+      )
+      loon_manifest = manifest.merge("outputs" => loon_outputs)
+      File.write(File.join(File.dirname(loon_output), "manifest.yml"), YAML.dump(loon_manifest))
+    end
     manifest
   end
 end
@@ -353,7 +600,8 @@ if $PROGRAM_NAME == __FILE__
       config_path: File.join(root, "config", "splits.yml"),
       manual_path: File.join(root, "manual", "Egern", "Rules"),
       output: File.join(root, "generated", "Egern", "Rules"),
-      mihomo_output: File.join(root, "generated", "Mihomo", "Rules")
+      mihomo_output: File.join(root, "generated", "Mihomo", "Rules"),
+      loon_output: File.join(root, "generated", "Loon", "Rules")
     }
     OptionParser.new do |parser|
       parser.banner = "Usage: ruby scripts/build.rb --v2fly FILE --anti-ad FILE --telegram FILE"
@@ -364,6 +612,7 @@ if $PROGRAM_NAME == __FILE__
       parser.on("--manual PATH", "Manual rules directory") { |value| options[:manual_path] = value }
       parser.on("--output PATH", "Generated rules directory") { |value| options[:output] = value }
       parser.on("--mihomo-output PATH", "Generated Mihomo rules directory") { |value| options[:mihomo_output] = value }
+      parser.on("--loon-output PATH", "Generated Loon rules directory") { |value| options[:loon_output] = value }
     end.parse!
     %i[v2fly_path anti_ad_path telegram_path].each { |key| abort "--#{key.to_s.tr('_', '-')} is required" unless options[key] }
 
