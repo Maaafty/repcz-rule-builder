@@ -163,4 +163,4 @@ DOMAIN-SUFFIX,x.ai
 DOMAIN-SUFFIX,youmind.ai
 DOMAIN-SUFFIX,youmind.com
 DOMAIN-SUFFIX,youmind.site
-URL-REGEX,^https?://(?:chatgpt-async-webps-prod-\s+-\d+\.webpubsub\.azure\.com)(?::[0-9]+)?(?:[/?#]|$)
+URL-REGEX,^https?://(?:chatgpt-async-webps-prod-\S+-\d+\.webpubsub\.azure\.com)(?::[0-9]+)?(?:[/?#]|$)

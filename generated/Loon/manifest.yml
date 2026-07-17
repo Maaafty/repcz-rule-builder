@@ -29,7 +29,5 @@ outputs:
   IP-CIDR/ChinaIP: 1
   Domain/Reject: 99983
   Domain/Manual_DIRECT: 2
-  Domain/Manual_DNS_Domestic: 2
-  Domain/Manual_DNS_Foreign: 1
   Domain/Manual_PROXY: 1
   Domain/Manual_REJECT: 1

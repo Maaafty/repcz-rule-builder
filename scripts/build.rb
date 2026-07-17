@@ -41,8 +41,7 @@ module EgernRules
     "Domain" => %w[domain_set domain_keyword_set domain_suffix_set domain_regex_set],
     "IP-CIDR" => %w[geoip_set ip_cidr_set ip_cidr6_set]
   }.freeze
-  DOMESTIC_DNS = "https://dns.alidns.com/dns-query"
-  FOREIGN_DNS = "https://cloudflare-dns.com/dns-query"
+  LOON_EXCLUDED_MANUAL_OUTPUTS = %w[Manual_DNS_Domestic Manual_DNS_Foreign].freeze
   SOURCE_URLS = {
     "v2fly" => "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat_plain.yml",
     "anti_ad" => "https://raw.githubusercontent.com/privacy-protection-tools/anti-AD/master/anti-ad-surge.txt",
@@ -75,9 +74,11 @@ module EgernRules
     type = parts.shift
     tags = []
     tags.unshift(parts.pop.delete_prefix("@")) while parts.last&.start_with?("@")
-    value = parts.join(":").strip.downcase
+    value = parts.join(":").strip
     raise "Unsupported v2fly rule type: #{type}" unless TYPE_FIELDS.key?(type)
     raise "Empty v2fly rule: #{line}" if value.empty?
+
+    value = value.downcase unless type == "regexp"
 
     { "field" => TYPE_FIELDS.fetch(type), "value" => value, "tags" => Set.new(tags) }
   end
@@ -289,40 +290,6 @@ module EgernRules
     end
   end
 
-  def manual_fields(manual_path, name)
-    return {} unless manual_path
-
-    path = File.join(manual_path, "#{name}.yaml")
-    File.exist?(path) ? load_yaml(path) : {}
-  end
-
-  def append_loon_dns_hosts(lines, fields, server, label)
-    lines << "# #{label}"
-    Array(fields["domain_set"]).sort.each { |value| lines << "#{value} = server:#{server}" }
-    Array(fields["domain_suffix_set"]).sort.each do |value|
-      lines << "#{value} = server:#{server}"
-      lines << "*.#{value} = server:#{server}"
-    end
-    skipped = Array(fields["domain_keyword_set"]).length + Array(fields["domain_regex_set"]).length
-    lines << "# Skipped #{skipped} keyword/regex DNS mappings unsupported by Loon Host syntax." if skipped.positive?
-    lines << ""
-  end
-
-  def dump_loon_dns_plugin(china_domain:, manual_domestic:, manual_foreign:)
-    domestic = merge_fields(china_domain, manual_domestic)
-    lines = [
-      "#!name=Egern Rule Builder DNS",
-      "#!desc=Domestic/foreign encrypted DNS mappings generated from ChinaDomain and manual DNS overrides.",
-      "#!author=Maaafty",
-      "#!homepage=https://github.com/Maaafty/egern-rule-builder",
-      "",
-      "[Host]"
-    ]
-    append_loon_dns_hosts(lines, domestic, DOMESTIC_DNS, "ChinaDomain + Manual_DNS_Domestic")
-    append_loon_dns_hosts(lines, manual_foreign, FOREIGN_DNS, "Manual_DNS_Foreign")
-    lines.join("\n").rstrip + "\n"
-  end
-
   def write_loon_rule_files(output, name, fields, sources, no_resolve: false)
     LOON_RULE_FAMILIES.each_with_object({}) do |(family, family_fields), counts|
       selected = select_fields(fields, family_fields)
@@ -358,6 +325,7 @@ module EgernRules
       Dir[File.join(manual_path, "*.yaml")].sort.each do |path|
         name = File.basename(path, ".yaml")
         raise "#{name}: manual rule set conflicts with generated output" if reserved_names.include?(name)
+        next if LOON_EXCLUDED_MANUAL_OUTPUTS.include?(name)
 
         fields = load_yaml(path)
         raise "#{name}: manual rule set is empty" if rule_count(fields).zero?
@@ -374,15 +342,7 @@ module EgernRules
     end
 
     plugin_path = File.join(File.dirname(output), "Plugins", "DNS.plugin")
-    FileUtils.mkdir_p(File.dirname(plugin_path))
-    File.write(
-      plugin_path,
-      dump_loon_dns_plugin(
-        china_domain: generated_outputs.fetch("ChinaDomain"),
-        manual_domestic: manual_fields(manual_path, "Manual_DNS_Domestic"),
-        manual_foreign: manual_fields(manual_path, "Manual_DNS_Foreign")
-      )
-    )
+    FileUtils.rm_f(plugin_path)
     loon_outputs
   end
 
