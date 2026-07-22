@@ -2,7 +2,7 @@
 sources:
   v2fly:
     url: https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat_plain.yml
-    sha256: 4acf4ae183ae27b7afb699400ba5ce5c564ebc43cc8014aaf46bd3edd8b9a4f2
+    sha256: 767ee879999bf4dba7dd33215b6da07da4abfc8eb8f95bdb3c36c9002766130b
   anti_ad:
     url: https://raw.githubusercontent.com/privacy-protection-tools/anti-AD/master/anti-ad-surge.txt
     sha256: 9f300eaf982a158d7d8058f0528b69234b114da2c4880ef1071052b9f68b7276
@@ -25,7 +25,7 @@ outputs:
   Domain/Telegram: 21
   IP-CIDR/Telegram: 14
   Domain/Social: 489
-  Domain/ChinaDomain: 8491
+  Domain/ChinaDomain: 8556
   IP-CIDR/ChinaIP: 1
   Domain/Reject: 100269
   Domain/Manual_DIRECT: 2
