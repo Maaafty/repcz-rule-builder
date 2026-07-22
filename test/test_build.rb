@@ -277,6 +277,7 @@ class BuildTest < Minitest::Test
       .select { |_name, references| references.length > 1 }.keys
     assert_equal remote_rules.length, remote_rules.map { |line| line[/tag=([^,]+)/, 1] }.uniq.length
     assert_includes section_lines(config, "General"), "disable-udp-ports = 443"
+    assert_includes section_lines(config, "General"), "domain-reject-mode = Request"
     assert_includes section_lines(config, "General"), "wifi-access-socks5-port = 6153"
     refute_includes config, "[Plugin]"
     assert_equal %w[Proxy Streaming AI Game Telegram Social Apple Microsoft Google Final],
