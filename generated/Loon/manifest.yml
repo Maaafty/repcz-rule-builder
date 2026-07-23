@@ -5,7 +5,7 @@ sources:
     sha256: 767ee879999bf4dba7dd33215b6da07da4abfc8eb8f95bdb3c36c9002766130b
   anti_ad:
     url: https://raw.githubusercontent.com/privacy-protection-tools/anti-AD/master/anti-ad-surge.txt
-    sha256: 9f300eaf982a158d7d8058f0528b69234b114da2c4880ef1071052b9f68b7276
+    sha256: e5439d2aaac62e9593f75e841ba38dae05be561e74ddee4216738a6090d6e453
   telegram:
     url: https://core.telegram.org/resources/cidr.txt
     sha256: 3ecd072cedf72eceee6961b18a51e37f905d5ce4a656a5d24cf5fea63e6ec651
@@ -27,7 +27,7 @@ outputs:
   Domain/Social: 489
   Domain/ChinaDomain: 8556
   IP-CIDR/ChinaIP: 1
-  Domain/Reject: 100269
+  Domain/Reject: 100728
   Domain/Manual_DIRECT: 2
   Domain/Manual_PROXY: 1
   Domain/Manual_REJECT: 1
