@@ -2,7 +2,7 @@
 sources:
   v2fly:
     url: https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat_plain.yml
-    sha256: 767ee879999bf4dba7dd33215b6da07da4abfc8eb8f95bdb3c36c9002766130b
+    sha256: 7c6d64befcd12610494fe40c1ec0fe59fe8e0b07c6a5208385fe85710f36da74
   anti_ad:
     url: https://raw.githubusercontent.com/privacy-protection-tools/anti-AD/master/anti-ad-surge.txt
     sha256: e5439d2aaac62e9593f75e841ba38dae05be561e74ddee4216738a6090d6e453
